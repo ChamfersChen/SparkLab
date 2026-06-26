@@ -1,0 +1,58 @@
+# SparkLab API 镜像（开发用，依赖通过卷挂载源码热重载）
+FROM base-api:0.1.0
+# COPY --from=ghcr.io/astral-sh/uv:0.7.2 /uv /uvx /bin/
+# COPY --from=node:24-slim /usr/local/bin /usr/local/bin
+# COPY --from=node:24-slim /usr/local/lib/node_modules /usr/local/lib/node_modules
+# COPY --from=node:24-slim /usr/local/include /usr/local/include
+# COPY --from=node:24-slim /usr/local/share /usr/local/share
+
+# # 设置工作目录
+# WORKDIR /app
+
+# # 环境变量设置
+# ENV TZ=Asia/Shanghai \
+#     UV_PROJECT_ENVIRONMENT="/usr/local" \
+#     UV_COMPILE_BYTECODE=1 \
+#     DEBIAN_FRONTEND=noninteractive
+
+# # 设置 npm 镜像源，为 MCP 和 Skills 安装依赖
+# RUN npm config set registry https://registry.npmmirror.com --global \
+#     && npm cache clean --force
+
+# # 设置代理和时区，更换镜像源，安装系统依赖 - 合并为一个RUN减少层数
+# RUN set -ex \
+#     # (A) 设置时区
+#     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
+#     # (B) 替换清华源 (针对 Debian Bookworm 的新版格式)
+#     && sed -i 's|deb.debian.org|mirrors.tuna.tsinghua.edu.cn|g' /etc/apt/sources.list.d/debian.sources \
+#     && sed -i 's|security.debian.org/debian-security|mirrors.tuna.tsinghua.edu.cn/debian-security|g' /etc/apt/sources.list.d/debian.sources \
+#     # (C) 安装必要的系统库
+#     && apt-get update \
+#     && apt-get install -y --no-install-recommends --fix-missing \
+#         curl \
+#         ffmpeg \
+#         fonts-liberation \
+#         fonts-noto-cjk \
+#         git \
+#         libpq5 \
+#         libsm6 \
+#         libxext6 \
+#         libreoffice-impress-nogui \
+#         libreoffice-writer-nogui \
+#     # (D) 清理垃圾，减小体积
+#     && apt-get clean \
+#     && rm -rf /var/lib/apt/lists/*
+
+# 先复制依赖清单以利用 Docker 层缓存
+COPY backend/pyproject.toml backend/uv.lock* /app/
+
+# 安装依赖（生产 + 开发依赖；开发环境需要 ruff、pytest 等）
+RUN uv sync --no-install-project || true
+
+# 源码通过 volume 挂载，容器启动后由 uvicorn --reload 监听变更
+# 此处不复制源码，避免重建镜像
+
+EXPOSE 5050
+
+# 默认命令由 docker-compose 提供；这里保留一个兜底
+CMD ["uv", "run", "--no-sync", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "5050"]

@@ -1,0 +1,95 @@
+x-api-env: &api-env
+  SPARKLAB_ENV: ${SPARKLAB_ENV:-development}
+  SPARKLAB_CORS_ORIGINS: ${SPARKLAB_CORS_ORIGINS:-}
+  POSTGRES_URL: ${POSTGRES_URL:-postgresql+asyncpg://postgres:postgres@postgres:5432/sparklab}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  JWT_SECRET: ${JWT_SECRET:?JWT_SECRET 必须在 .env 中设置}
+  JWT_ALGORITHM: ${JWT_ALGORITHM:-HS256}
+  JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-43200}
+  INITIAL_SUPERADMIN_USERNAME: ${INITIAL_SUPERADMIN_USERNAME:-admin}
+  INITIAL_SUPERADMIN_PASSWORD: ${INITIAL_SUPERADMIN_PASSWORD:?INITIAL_SUPERADMIN_PASSWORD 必须在 .env 中设置}
+  TZ: ${TZ:-Asia/Shanghai}
+  RUNNING_IN_DOCKER: "true"
+
+services:
+  api-dev:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    image: sparklab-api:dev
+    container_name: sparklab-api-dev
+    working_dir: /app
+    volumes:
+      - ./backend/server:/app/server
+      - ./backend/package:/app/package
+      - ./backend/test:/app/test
+      - ./backend/alembic:/app/alembic
+      - ./backend/alembic.ini:/app/alembic.ini
+      - ./.env:/app/.env
+    ports:
+      - "5151:5050"
+    networks:
+      - app-network
+    env_file:
+      - .env
+    environment:
+      <<: *api-env
+    command: >
+      uv run --no-sync uvicorn server.main:app
+      --host 0.0.0.0 --port 5050
+      --reload --reload-dir /app/server --reload-dir /app/package
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5050/api/system/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    container_name: sparklab-postgres
+    ports:
+      - "5532:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-sparklab}
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ./docker/volumes/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-sparklab}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: sparklab-redis
+    ports:
+      - "6679:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - ./docker/volumes/redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app-network
+    restart: unless-stopped
+
+networks:
+  app-network:
+    driver: bridge
+    name: sparklab-network

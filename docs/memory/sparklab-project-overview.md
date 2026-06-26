@@ -33,12 +33,14 @@ metadata:
 
 **项目状态（2026-06-26）**：
 - ✅ 阶段 0-3 完成：项目骨架搭建完毕，首次集成验证通过
-- ✅ 后端：FastAPI + SQLAlchemy + Alembic + Redis，本机可跑 16/16 测试通过
+- ✅ 阶段 4 完成：认证 + 激活码 + 标签模块（含后端路由/服务/仓储/模型/迁移 + e2e 测试）
+- ✅ 阶段 5 部分完成：前端登录/激活页 UI + auth/activation/tag API 封装
+- 🟡 阶段 6 进行中：标签管理页 UI 已修复 template 错误，其他业务模块（模板/Playbook/资讯/收藏/看板）待开发
+- ✅ 后端：FastAPI + SQLAlchemy + Alembic + Redis，本机可跑全部测试通过
 - ✅ 前端：Vue 3 + Vite + Pinia + Ant Design Vue，路由守卫就绪
 - ✅ 欢迎页（`/`）：public，Hero CTA 按登录态切换，4 张业务模块入口卡（骨架阶段 disabled）；通用 `AppHeader` + `ModuleCard` 组件已抽出
 - ✅ 认证方式：JWT + Bearer Header（前端 localStorage 存储）
 - 🛠 运行拓扑：后端 Docker Compose（API 宿主机端口 **5151**），前端本机 `pnpm dev`（5173）；`docker-compose.yml` 中 `web-dev` 服务已注释保留
-- 📋 下一阶段：阶段 4 — 认证 + 激活码模块开发
 
 **相关文档**：`AGENTS.md`、`ARCHITECTURE.md`、`docs/SparkLab-产品设计文档.md`、`docs/design.md`、`docs/2026-06-25-项目骨架搭建.md`。
 开发约束细节见 [[sparklab-dev-constraints]]，Yuxi 参考对照见 [[yuxi-reference-mapping]]，认证方式见 [[sparklab-auth-bearer-header]]，欢迎页定义见 [[sparklab-homepage-is-welcome-page]]。

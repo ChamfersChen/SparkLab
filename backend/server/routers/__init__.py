@@ -11,6 +11,7 @@ from server.routers.activation_router import activation
 from server.routers.admin import admin_router
 from server.routers.auth_router import auth
 from server.routers.system_router import system
+from server.routers.tag_router import tag
 from server.routers.template_router import template
 
 router = APIRouter()
@@ -22,6 +23,9 @@ router.include_router(system)  # /api/system/*
 router.include_router(auth)  # /api/auth/*
 router.include_router(activation)  # /api/activation/*
 
+# 标签
+router.include_router(tag)  # /api/tags/*
+
 # 模板
 router.include_router(template)  # /api/templates/*
 
@@ -30,7 +34,6 @@ router.include_router(admin_router)  # /api/admin/*
 
 # 后续随业务模块陆续接入：
 # router.include_router(playbooks)   # /api/playbooks/*
-# router.include_router(tags)        # /api/tags/*
 # router.include_router(favorites)   # /api/favorites/*
 # router.include_router(news)        # /api/news/*
 # router.include_router(ai_platforms)  # /api/ai-platforms/*

@@ -113,7 +113,20 @@ class FillDataResponse(BaseModel):
     input: str
     output: str
     example: str
-    variable_hints: dict[str, str] = {}
+    variable_hints: dict[str, str] | str = {}
+
+    @field_validator("variable_hints", mode="before")
+    @classmethod
+    def parse_hints(cls, v):
+        if v is None:
+            return {}
+        if isinstance(v, dict):
+            return v
+        import json
+        try:
+            return json.loads(v)
+        except (json.JSONDecodeError, TypeError):
+            return {}
 
 
 class VariableExtractResponse(BaseModel):

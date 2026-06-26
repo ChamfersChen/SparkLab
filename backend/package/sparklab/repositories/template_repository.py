@@ -176,3 +176,15 @@ class TemplateRepository:
         template.status = TemplateStatus.ARCHIVED
         await self.db.flush()
         return True
+
+    async def hard_delete(self, template_id: int) -> bool:
+        """物理删除：移除 DB 记录。
+
+        template_tags 关联靠 TemplateTag.template_id 外键的 ondelete=CASCADE 自动清理。
+        """
+        template = await self.db.get(Template, template_id)
+        if not template:
+            return False
+        await self.db.delete(template)
+        await self.db.flush()
+        return True

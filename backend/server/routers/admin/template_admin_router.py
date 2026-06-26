@@ -20,7 +20,7 @@ from sparklab.schemas.template import (
 from sparklab.services.template_service import TemplateService
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from server.utils.auth_middleware import get_current_admin, get_db, get_required_user
+from server.utils.auth_middleware import get_current_admin, get_current_super_admin, get_db, get_required_user
 
 template_admin = APIRouter(
     prefix="/templates",
@@ -119,3 +119,19 @@ async def delete_template(
     service: TemplateService = Depends(_get_service),
 ):
     await service.delete_template(template_id)
+
+
+@template_admin.delete(
+    "/{template_id}/hard",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(get_current_super_admin)],
+)
+async def hard_delete_template(
+    template_id: int,
+    service: TemplateService = Depends(_get_service),
+):
+    """物理删除模板（仅超管）：从 DB 删除该条记录，template_tags 关联 CASCADE 自动清理。
+
+    与软删（archived）不同：此操作不可恢复，请谨慎使用。
+    """
+    await service.hard_delete_template(template_id)

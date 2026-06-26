@@ -5,9 +5,12 @@
 - GET    /api/templates/{id}         → 模板详情
 - GET    /api/templates/{id}/fill    → 模板填写数据（变量提取 + hints）
 - POST   /api/templates/{id}/use     → 使用计数 +1
+
+可见性：published 模板对所有登录用户可见；draft/archived 仅作者本人可见（非作者 → 404）。
 """
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sparklab.models.user import User
 from sparklab.schemas.template import (
     FillDataResponse,
     TemplateListResponse,
@@ -54,12 +57,11 @@ async def list_templates(
 @template.get("/{template_id}", response_model=TemplateResponse)
 async def get_template(
     template_id: int,
-    user=Depends(get_required_user),
+    current_user: User = Depends(get_required_user),
     service: TemplateService = Depends(_get_service),
 ):
-    template = await service.get_template(template_id)
+    template = await service.get_template_for_user(template_id, current_user.id)
     if template is None:
-        from fastapi import HTTPException, status
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
     return TemplateResponse.model_validate(template)
 
@@ -67,13 +69,12 @@ async def get_template(
 @template.get("/{template_id}/fill", response_model=FillDataResponse)
 async def get_fill_data(
     template_id: int,
-    user=Depends(get_required_user),
+    current_user: User = Depends(get_required_user),
     service: TemplateService = Depends(_get_service),
 ):
     """获取模板填写页所需数据（变量清单 + hints）。"""
-    template = await service.get_template(template_id)
+    template = await service.get_template_for_user(template_id, current_user.id)
     if template is None:
-        from fastapi import HTTPException, status
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
     return FillDataResponse(
         template_id=template.id,
@@ -91,8 +92,11 @@ async def get_fill_data(
 @template.post("/{template_id}/use", response_model=dict)
 async def increment_use(
     template_id: int,
-    user=Depends(get_required_user),
+    current_user: User = Depends(get_required_user),
     service: TemplateService = Depends(_get_service),
 ):
+    template = await service.get_template_for_user(template_id, current_user.id)
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
     await service.increment_use_count(template_id)
     return {"message": "ok"}

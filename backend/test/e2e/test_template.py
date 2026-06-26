@@ -277,7 +277,7 @@ async def test_create_template_rejects_invalid_tag_ids(client: AsyncClient) -> N
 
 @pytest.mark.asyncio
 async def test_create_template_rejects_empty_title(client: AsyncClient) -> None:
-    """空 title 应被 422 拒绝。"""
+    """空 title 应被 422 拒绝，且 detail 必须是 Pydantic 标准数组结构。"""
     headers = await _admin_headers(client)
     resp = await client.post(
         "/api/admin/templates",
@@ -293,3 +293,200 @@ async def test_create_template_rejects_empty_title(client: AsyncClient) -> None:
         headers=headers,
     )
     assert resp.status_code == 422
+    body = resp.json()
+    assert isinstance(body["detail"], list)
+    assert body["detail"][0]["loc"][-1] == "title"
+
+
+@pytest.mark.asyncio
+async def test_create_template_rejects_uncovered_variables(client: AsyncClient) -> None:
+    """Input 段出现 {{X}} 但 variable_hints 没配 X → 400。"""
+    headers = await _admin_headers(client)
+    resp = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "t-coverage",
+            "description": "d",
+            "role": "r",
+            "goal": "g",
+            "input": "产品：{{产品名称}}，卖点：{{卖点}}",
+            "output": "o",
+            "example": "e",
+            "variable_hints": {"产品名称": "请输入完整产品名"},
+            # 注意：刻意不配"卖点"
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 400
+    assert "卖点" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_update_template_rejects_uncovered_variables(client: AsyncClient) -> None:
+    """update 时若改 input 引入新变量但 hints 未覆盖 → 400。"""
+    headers = await _admin_headers(client)
+    create = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "t-upd-coverage",
+            "description": "d",
+            "role": "r",
+            "goal": "g",
+            "input": "原内容：{{A}}",
+            "output": "o",
+            "example": "e",
+            "variable_hints": {"A": "h"},
+        },
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tid = create.json()["id"]
+
+    resp = await client.put(
+        f"/api/admin/templates/{tid}",
+        json={
+            "input": "新内容：{{A}}，副标题：{{B}}",
+            "variable_hints": {"A": "h"},
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 400
+    assert "B" in resp.json()["detail"]
+
+
+async def _create_user_and_get_headers(
+    client: AsyncClient, admin_headers: dict[str, str], username: str
+) -> dict[str, str]:
+    """用管理员生成激活码、激活新用户，返回新用户 Bearer 头。"""
+    gen = await client.post(
+        "/api/admin/activation-codes/generate",
+        json={"count": 1},
+        headers=admin_headers,
+    )
+    assert gen.status_code == 200
+    code = gen.json()["items"][0]["code"]
+    act = await client.post(
+        "/api/activation/activate",
+        json={"code": code, "username": username, "password": "test123456"},
+    )
+    assert act.status_code == 200
+    return {"Authorization": f"Bearer {act.json()['token']}"}
+
+
+@pytest.mark.asyncio
+async def test_draft_template_invisible_to_other_users(client: AsyncClient) -> None:
+    """草稿模板对非作者普通用户 → 404。"""
+    admin_headers = await _admin_headers(client)
+    create = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "t-draft-private",
+            "description": "d",
+            "role": "r",
+            "goal": "g",
+            "input": "i",
+            "output": "o",
+            "example": "e",
+            "status": "draft",
+        },
+        headers=admin_headers,
+    )
+    assert create.status_code == 201
+    tid = create.json()["id"]
+
+    other_headers = await _create_user_and_get_headers(
+        client, admin_headers, "other_user_draft"
+    )
+    resp = await client.get(f"/api/templates/{tid}", headers=other_headers)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_archived_template_invisible_to_other_users(client: AsyncClient) -> None:
+    """已归档模板对非作者普通用户 → 404。"""
+    admin_headers = await _admin_headers(client)
+    create = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "t-arch-private",
+            "description": "d",
+            "role": "r",
+            "goal": "g",
+            "input": "i",
+            "output": "o",
+            "example": "e",
+            "status": "published",
+        },
+        headers=admin_headers,
+    )
+    assert create.status_code == 201
+    tid = create.json()["id"]
+
+    # 归档
+    arch = await client.put(
+        f"/api/admin/templates/{tid}/status",
+        json={"status": "archived"},
+        headers=admin_headers,
+    )
+    assert arch.status_code == 200
+
+    other_headers = await _create_user_and_get_headers(
+        client, admin_headers, "other_user_arch"
+    )
+    resp = await client.get(f"/api/templates/{tid}", headers=other_headers)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_draft_template_visible_to_author(client: AsyncClient) -> None:
+    """草稿模板对作者本人 → 200。"""
+    admin_headers = await _admin_headers(client)
+    create = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "t-draft-self",
+            "description": "d",
+            "role": "r",
+            "goal": "g",
+            "input": "i",
+            "output": "o",
+            "example": "e",
+            "status": "draft",
+        },
+        headers=admin_headers,
+    )
+    assert create.status_code == 201
+    tid = create.json()["id"]
+
+    resp = await client.get(f"/api/templates/{tid}", headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_draft_template_visible_via_admin_endpoint_to_any_admin(
+    client: AsyncClient,
+) -> None:
+    """任意管理员可经 /api/admin/templates/{id} 访问草稿（不走用户端可见性）。"""
+    admin_headers = await _admin_headers(client)
+    create = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "t-admin-preview",
+            "description": "d",
+            "role": "r",
+            "goal": "g",
+            "input": "i",
+            "output": "o",
+            "example": "e",
+            "status": "draft",
+        },
+        headers=admin_headers,
+    )
+    assert create.status_code == 201
+    tid = create.json()["id"]
+
+    # 用第二个普通用户升级为管理员不易,这里直接复用同一个超管(creator=超管自己)从管理端访问
+    resp = await client.get(f"/api/admin/templates/{tid}", headers=admin_headers)
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "draft"

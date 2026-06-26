@@ -4,7 +4,7 @@
 1. 应用 Alembic 迁移至 head（开发期自动；生产期可改为手动）
 2. 验证 Postgres 连接
 3. 验证 Redis 连接
-4. （后续接入认证模块后）创建初始超管、预设默认 AI 平台、预设默认标签
+4. 创建初始超管（仅数据库无用户时）
 
 关闭顺序：
 1. 释放 DB 连接池
@@ -15,7 +15,9 @@ from contextlib import asynccontextmanager
 
 from alembic.config import Config
 from fastapi import FastAPI
-from sparklab.storage.postgres import dispose_engine, get_engine
+from sparklab.config import get_settings
+from sparklab.services.auth_service import AuthService
+from sparklab.storage.postgres import dispose_engine, get_async_session, get_engine
 from sparklab.storage.redis import close_redis, get_redis
 from sparklab.utils.logger import logger
 
@@ -23,13 +25,22 @@ from alembic import command
 
 
 def _run_migrations() -> None:
-    """同步调用 Alembic upgrade head。
-
-    Alembic 的 command API 是同步的，在 lifespan 中通过 run_in_executor 即可。
-    迁移失败应当抛出，让进程启动失败（不掩盖问题）。
-    """
     cfg = Config("alembic.ini")
     command.upgrade(cfg, "head")
+
+
+async def _ensure_superadmin() -> None:
+    settings = get_settings()
+    async with get_async_session() as session:
+        service = AuthService(session)
+        await service.ensure_superadmin(
+            settings.initial_superadmin_username,
+            settings.initial_superadmin_password,
+        )
+    logger.info(
+        "Initial superadmin checked",
+        extra={"username": settings.initial_superadmin_username},
+    )
 
 
 @asynccontextmanager
@@ -55,6 +66,9 @@ async def lifespan(_app: FastAPI):
     redis = get_redis()
     await redis.ping()
     logger.info("Redis connected")
+
+    # 4. 创建初始超管
+    await _ensure_superadmin()
 
     logger.info("SparkLab API startup complete")
     yield

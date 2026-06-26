@@ -1,7 +1,4 @@
-"""用例层 - 业务流程编排。
+from sparklab.services.auth_service import AuthService
+from sparklab.services.template_service import TemplateService
 
-设计约定：
-- 串联 repositories 与外部系统
-- 跨模块流程的入口都从这里走
-- 不直接处理 HTTP；路由层调用服务函数
-"""
+__all__ = ["AuthService", "TemplateService"]

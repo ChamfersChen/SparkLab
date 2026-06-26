@@ -1,7 +1,9 @@
-"""数据访问层 - 封装 SQLAlchemy 查询。
+from sparklab.repositories.activation_code_repository import ActivationCodeRepository
+from sparklab.repositories.template_repository import TemplateRepository
+from sparklab.repositories.user_repository import UserRepository
 
-设计约定：
-- 每个仓储管理单一聚合根（User / Template / Playbook ...）
-- 路由层不许绕过仓储直接操作模型
-- 仓储不感知 HTTP，参数是普通 Python 类型或 Pydantic 模型
-"""
+__all__ = [
+    "UserRepository",
+    "ActivationCodeRepository",
+    "TemplateRepository",
+]

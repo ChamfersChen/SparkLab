@@ -1,1 +1,23 @@
-"""Pydantic 数据结构 - 请求/响应模型。"""
+from sparklab.schemas.auth import (
+    ActivateRequest,
+    ActivateResponse,
+    ActivationVerifyRequest,
+    ActivationVerifyResponse,
+    LoginRequest,
+    LoginResponse,
+    MessageResponse,
+    PasswordChangeRequest,
+    UserInfo,
+)
+
+__all__ = [
+    "LoginRequest",
+    "LoginResponse",
+    "PasswordChangeRequest",
+    "UserInfo",
+    "ActivationVerifyRequest",
+    "ActivationVerifyResponse",
+    "ActivateRequest",
+    "ActivateResponse",
+    "MessageResponse",
+]

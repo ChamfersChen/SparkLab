@@ -1,10 +1,11 @@
-"""auth_middleware 的契约测试。
+"""auth_middleware 的行为测试。
 
-阶段 1 中，4 个依赖函数都是骨架，调用 get_current_user 应抛 NotImplementedError。
-此测试**锁定该契约**：当未来认证模块接入后，这些测试需要被替换为真实行为测试。
+get_current_user 的完整功能验证依赖 httpx 集成测试（真实请求链路）；
+单元层测试只验证依赖函数的直接行为。
 """
 
 import pytest
+from fastapi import HTTPException
 
 from server.utils.auth_middleware import (
     get_current_admin,
@@ -15,29 +16,25 @@ from server.utils.auth_middleware import (
 
 
 @pytest.mark.asyncio
-async def test_get_current_user_is_not_implemented() -> None:
-    """阶段 1 占位：get_current_user 调用应抛 NotImplementedError。"""
-    with pytest.raises(NotImplementedError):
-        await get_current_user(authorization=None, db=None)
+async def test_get_current_user_no_auth_returns_none() -> None:
+    user = await get_current_user(authorization=None, db=None)
+    assert user is None
 
 
 @pytest.mark.asyncio
-async def test_get_required_user_propagates_not_implemented() -> None:
-    """get_required_user 内部依赖 get_current_user，应一并抛 NotImplementedError。"""
-    with pytest.raises(NotImplementedError):
-        user = await get_current_user(authorization="Bearer fake", db=None)
-        await get_required_user(user=user)
+async def test_get_current_user_invalid_prefix_returns_none() -> None:
+    user = await get_current_user(authorization="Basic fake", db=None)
+    assert user is None
 
 
 @pytest.mark.asyncio
-async def test_get_current_admin_propagates_not_implemented() -> None:
-    with pytest.raises(NotImplementedError):
-        user = await get_current_user(authorization="Bearer fake", db=None)
-        await get_current_admin(user=user)
+async def test_get_current_user_bearer_no_db_returns_none() -> None:
+    user = await get_current_user(authorization="Bearer invalidtoken", db=None)
+    assert user is None
 
 
 @pytest.mark.asyncio
-async def test_get_current_super_admin_propagates_not_implemented() -> None:
-    with pytest.raises(NotImplementedError):
-        user = await get_current_user(authorization="Bearer fake", db=None)
-        await get_current_super_admin(user=user)
+async def test_get_required_user_with_none_raises_401() -> None:
+    with pytest.raises(HTTPException) as exc:
+        await get_required_user(user=None)
+    assert exc.value.status_code == 401

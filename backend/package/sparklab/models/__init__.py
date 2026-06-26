@@ -5,6 +5,22 @@
 扫描所有模型以自动生成迁移。
 """
 
+from sparklab.models.activation_code import ActivationCode, ActivationCodeStatus
 from sparklab.models.base import Base, TimestampMixin
+from sparklab.models.tag import Tag, TagCategory
+from sparklab.models.template import Template, TemplateStatus, TemplateTag
+from sparklab.models.user import User, UserRole
 
-__all__ = ["Base", "TimestampMixin"]
+__all__ = [
+    "Base",
+    "TimestampMixin",
+    "User",
+    "UserRole",
+    "ActivationCode",
+    "ActivationCodeStatus",
+    "Tag",
+    "TagCategory",
+    "Template",
+    "TemplateStatus",
+    "TemplateTag",
+]

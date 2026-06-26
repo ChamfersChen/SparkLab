@@ -1,0 +1,84 @@
+/**
+ * SparkLab 颜色 token - 浅色模式
+ * 严格对应 docs/design.md 的设计规范。
+ *
+ * 暗色模式覆盖见 base.dark.css。新增页面不要硬编码色值，必须走这些变量。
+ */
+
+:root {
+  /* --- 主色（科技蓝）--- */
+  --main-color: #3b82f6;
+  --main-700: #2563eb;
+  --main-600: #3b82f6;
+  --main-500: #60a5fa;
+  --main-50: #eff6ff;
+  --main-30: #dbeafe;
+  --main-10: #eff6ff;
+
+  /* --- 中性色 --- */
+  --gray-0: #ffffff;
+  --gray-10: #f8fafc;
+  --gray-25: #f1f5f9;
+  --gray-50: #e2e8f0;
+  --gray-100: #cbd5e1;
+  --gray-150: #94a3b8;
+  --gray-200: #64748b;
+  --gray-400: #94a3b8;
+  --gray-500: #64748b;
+  --gray-600: #475569;
+  --gray-900: #1e293b;
+  --gray-1000: #0f172a;
+
+  /* --- 文本语义变量（兼容 Ant Design Vue）--- */
+  --color-text: var(--gray-900);
+  --color-text-secondary: var(--gray-600);
+  --color-text-tertiary: var(--gray-500);
+
+  /* --- 成功 --- */
+  --color-success-50: #ecfdf5;
+  --color-success-100: #d1fae5;
+  --color-success-500: #10b981;
+  --color-success-700: #059669;
+  --color-success-900: #064e3b;
+
+  /* --- 错误 --- */
+  --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-500: #ef4444;
+  --color-error-700: #dc2626;
+  --color-error-900: #7f1d1d;
+
+  /* --- 警告 --- */
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-500: #f59e0b;
+  --color-warning-700: #b45309;
+  --color-warning-900: #92400e;
+
+  /* --- 信息 --- */
+  --color-info-50: #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-500: #3b82f6;
+  --color-info-700: #1d4ed8;
+  --color-info-900: #1e3a8a;
+
+  /* --- 辅助强调（少量场景，不替代主色）--- */
+  --color-accent-50: #faf5ff;
+  --color-accent-500: #a855f7;
+  --color-accent-700: #7e22ce;
+
+  /* --- 图表色 --- */
+  --chart-palette-1: #3b82f6;
+  --chart-palette-2: #10b981;
+  --chart-palette-3: #f59e0b;
+  --chart-palette-4: #a855f7;
+  --chart-palette-5: #ef4444;
+  --chart-palette-6: #06b6d4;
+  --chart-palette-7: #84cc16;
+  --chart-palette-8: #f43f5e;
+
+  /* --- 阴影（仅供真实浮层使用）--- */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+}

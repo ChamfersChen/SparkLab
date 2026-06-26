@@ -6,27 +6,73 @@ const routes = [
     path: '/login',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
-    meta: { public: true }
+    meta: { public: true, layout: 'blank' }
   },
   {
     path: '/activate',
     name: 'activate',
     component: () => import('@/views/ActivateView.vue'),
-    meta: { public: true }
+    meta: { public: true, layout: 'blank' }
   },
   {
     path: '/',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    // 公开页：未登录用户也能看到欢迎页与产品介绍；
-    // Hero 区按钮根据登录态切换（登录 ↔ 进入系统）。
-    meta: { public: true }
+    meta: { public: true, layout: 'blank' }
+  },
+  {
+    path: '/admin/activation-codes',
+    name: 'admin-activation-codes',
+    component: () => import('@/views/admin/ActivationCodeManage.vue'),
+    meta: { title: '激活码管理', layout: 'app' }
+  },
+  {
+    path: '/admin/tags',
+    name: 'admin-tags',
+    component: () => import('@/views/admin/TagManage.vue'),
+    meta: { title: '标签管理', layout: 'app' }
+  },
+  {
+    path: '/templates',
+    name: 'templates',
+    component: () => import('@/views/templates/TemplateList.vue'),
+    meta: { title: '模板库', layout: 'app' }
+  },
+  {
+    path: '/templates/:id',
+    name: 'template-detail',
+    component: () => import('@/views/templates/TemplateDetail.vue'),
+    meta: { title: '模板详情', layout: 'app' }
+  },
+  {
+    path: '/templates/:id/fill',
+    name: 'template-fill',
+    component: () => import('@/views/templates/TemplateFill.vue'),
+    meta: { title: '生成提示词', layout: 'app' }
+  },
+  {
+    path: '/admin/templates',
+    name: 'admin-templates',
+    component: () => import('@/views/admin/TemplateManage.vue'),
+    meta: { title: '模板管理', layout: 'app' }
+  },
+  {
+    path: '/admin/templates/create',
+    name: 'admin-template-create',
+    component: () => import('@/views/admin/TemplateEditor.vue'),
+    meta: { title: '新建模板', layout: 'app' }
+  },
+  {
+    path: '/admin/templates/:id/edit',
+    name: 'admin-template-edit',
+    component: () => import('@/views/admin/TemplateEditor.vue'),
+    meta: { title: '编辑模板', layout: 'app' }
   },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/views/NotFoundView.vue'),
-    meta: { public: true }
+    meta: { public: true, layout: 'blank' }
   }
 ]
 

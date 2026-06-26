@@ -1,18 +1,9 @@
 <script setup>
-/**
- * 应用顶栏 - 所有登录后页面共用。
- *
- * 职责：
- * - 品牌 Logo（点击回到 /）
- * - 当前用户身份展示（用户名 + 角色徽标）
- * - 用户菜单（含"退出登录"占位项；真实接入留到 Phase 4）
- *
- * 注意：本组件不假设业务模块入口位置，避免与 DashboardView 的卡片重复。
- */
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Zap, LogIn } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
+import { logout as apiLogout } from '@/apis/auth_api'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -20,21 +11,23 @@ const router = useRouter()
 const ROLE_META = {
   super_admin: { label: '超管', color: 'red' },
   admin: { label: '管理员', color: 'orange' },
-  user: { label: '用户', color: 'default' }
+  user: { label: '用户', color: 'default' },
 }
 
 const roleMeta = computed(() => ROLE_META[userStore.user?.role] || ROLE_META.user)
 
-function handleLogout() {
-  // TODO(Phase 4): 调用后端 /api/auth/logout，把 jti 加入 Redis 黑名单
+async function handleLogout() {
+  try {
+    await apiLogout()
+  } catch {
+    // 即使后端登出失败也清除本地状态
+  }
   userStore.logout()
   router.push({ name: 'login' })
 }
 
 function handleLogin() {
-  // TODO(Phase 4): router.push({ name: 'login' })
-  // 当前 UI 阶段不触发跳转
-  console.info('[stub] AppHeader 登录按钮点击')
+  router.push({ name: 'login' })
 }
 </script>
 

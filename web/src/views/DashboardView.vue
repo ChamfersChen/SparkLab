@@ -8,12 +8,14 @@
  * - 业务模块上线时，把对应 module 的 disabled 改 false 并配上 to/handler 即可。
  */
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { FileText, BookOpen, Newspaper, Settings, Sparkles, LogIn, ArrowRight } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import AppHeader from '@/components/AppHeader.vue'
 import ModuleCard from '@/components/ModuleCard.vue'
 
 const userStore = useUserStore()
+const router = useRouter()
 
 const greeting = computed(() => {
   if (!userStore.isLoggedIn) return '欢迎来到 SparkLab'
@@ -30,15 +32,11 @@ const subtitle = computed(() =>
 // ---------- Hero 区按钮处理（UI 阶段：仅 stub，handler 留待 Phase 4 接入） ----------
 
 function handleLogin() {
-  // TODO(Phase 4): router.push({ name: 'login' })
-  // 当前 UI 阶段不触发跳转
-  console.info('[stub] 登录按钮点击')
+  router.push({ name: 'login' })
 }
 
 function handleEnterSystem() {
-  // TODO(Phase 5): 跳转到首个业务模块（如 templates 列表）
-  // router.push({ name: 'templates' })
-  console.info('[stub] 进入系统按钮点击')
+  router.push({ name: 'templates' })
 }
 
 // 业务模块清单 - 业务上线时把对应项 disabled 改 false 并补 to/handler。
@@ -143,7 +141,7 @@ const PLATFORMS = ['DeepSeek', 'Kimi', '豆包', '通义千问']
         </div>
       </section>
 
-      <footer class="phase-tip">🚧 当前为骨架版本 · 鉴权与业务模块开发中</footer>
+      <footer class="phase-tip">🚧 业务模块开发中，敬请期待</footer>
     </a-layout-content>
   </a-layout>
 </template>

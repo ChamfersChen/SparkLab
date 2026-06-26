@@ -41,7 +41,7 @@ const collapsed = ref(false)
 
 // 用户端导航
 const userNavItems = [
-  { name: '首页', path: '/templates', icon: LayoutDashboard },
+  // { name: '首页', path: '/templates', icon: LayoutDashboard },
   { name: '模板库', path: '/templates', icon: FileText },
   { name: '工作流', path: '/playbooks', icon: BookOpen },
   { name: '资讯', path: '/news', icon: Newspaper },

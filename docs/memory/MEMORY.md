@@ -1,0 +1,7 @@
+- [SparkLab 项目概览](sparklab-project-overview.md) — 平台定位、技术栈、核心模块与不变量速查
+- [SparkLab 开发约束](sparklab-dev-constraints.md) — 路由薄/领域厚、软删除、JWT+Bearer Header、Docker 工作流等关键约束
+- [Yuxi 参考项目映射](yuxi-reference-mapping.md) — 从 Yuxi 借鉴哪些模式、哪些要剥离
+- [后端必须配套写测试](sparklab-backend-must-test.md) — 写完后端功能立即补 unit/integration/e2e，别等用户提
+- [鉴权用 Bearer Header](sparklab-auth-bearer-header.md) — JWT + Authorization Header + localStorage（与 Yuxi 一致）
+- [Alembic fileConfig 静默吞日志](alembic-filelogconfig-pitfall.md) — env.py 必须传 disable_existing_loggers=False
+- [首页是 public 欢迎页](sparklab-homepage-is-welcome-page.md) — `/` 路由 public，Hero CTA 按登录态切换 + 业务模块入口卡

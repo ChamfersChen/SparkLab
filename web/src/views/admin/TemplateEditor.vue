@@ -210,7 +210,7 @@ onMounted(() => {
       <!-- 顶部:图标+返回+标题 -->
       <header class="page-bar page-bar--editor">
         <div class="page-bar__left-group">
-          <FileText :size="20" class="page-bar__icon" />
+          <!-- <FileText :size="20" class="page-bar__icon" /> -->
           <button
             type="button"
             class="icon-text-btn"
@@ -277,7 +277,7 @@ onMounted(() => {
               <span class="section-badge">识别到 {{ extractedVars.length }} 个变量</span>
             </h2>
             <div class="hints-list">
-              <div v-for="v in extractedVars" :key="v" class="hint-item">
+              <div v-for="v in extractedVars" :key="v" class="hint-item hint-card">
                 <span class="hint-name">{{ v }}</span>
                 <a-input
                   v-model:value="form.variable_hints[v]"
@@ -297,15 +297,17 @@ onMounted(() => {
             <h2 class="section-title">标签配置</h2>
             <div v-for="(tagList, category) in tags" :key="category" class="tag-group">
               <span class="tag-group-label">{{ { platform: '平台', content_type: '内容类型', industry: '行业/场景' }[category] }}</span>
-              <a-tag
-                v-for="t in tagList"
-                :key="t.id"
-                :color="isTagSelected(t.id) ? 'blue' : 'default'"
-                class="tag-item"
-                @click="toggleTag(t.id)"
-              >
-                {{ t.name }}
-              </a-tag>
+              <div class="tag-list">
+                <span
+                  v-for="t in tagList"
+                  :key="t.id"
+                  class="tag-chip"
+                  :class="{ 'tag-chip--selected': isTagSelected(t.id) }"
+                  @click="toggleTag(t.id)"
+                >
+                  {{ t.name }}
+                </span>
+              </div>
             </div>
           </section>
 
@@ -378,14 +380,20 @@ onMounted(() => {
 
 .section {
   background: var(--gray-0);
-  border: 1px solid var(--gray-50);
-  border-radius: 10px;
-  padding: 20px;
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
+  padding: 20px 24px;
   margin-bottom: 16px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.section:hover {
+  border-color: var(--gray-200);
+  box-shadow: var(--shadow-sm);
 }
 
 .section-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
   margin: 0 0 16px;
@@ -413,6 +421,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .hint-name {
@@ -427,9 +436,9 @@ onMounted(() => {
 }
 
 .no-vars-hint {
-  background: var(--gray-0);
-  border: 1px dashed var(--gray-50);
-  border-radius: 8px;
+  background: var(--gray-10);
+  border: 1px dashed var(--gray-150);
+  border-radius: 6px;
   padding: 16px;
   font-size: 13px;
   color: var(--color-text-secondary);
@@ -456,11 +465,14 @@ onMounted(() => {
   color: var(--color-text-secondary);
   min-width: 70px;
   line-height: 24px;
+  padding-top: 4px;
 }
 
-.tag-item {
-  cursor: pointer;
-  margin: 2px;
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
 }
 
 .actions {
@@ -468,9 +480,20 @@ onMounted(() => {
   gap: 12px;
 }
 
-@media (max-width: 640px) {
-  .content {
-    padding: 0 16px 48px;
+@media (max-width: 768px) {
+  .page-content {
+    padding: 16px;
+  }
+  .section {
+    padding: 16px;
+    border-radius: 4px;
+  }
+  .actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .actions :deep(.ant-btn) {
+    width: 100%;
   }
 }
 </style>

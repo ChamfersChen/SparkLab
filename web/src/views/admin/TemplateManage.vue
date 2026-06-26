@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { Plus, Edit2, Check, StopCircle, Eye, Search, Trash2 } from 'lucide-vue-next'
+import { Plus, Edit2, Check, Eye, Trash2, FileText } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { adminListTemplates, adminChangeStatus, adminHardDeleteTemplate } from '@/apis/template_api'
 
@@ -122,6 +122,14 @@ const STATUS_MAP = {
   archived: { text: '已归档', cls: 'status-tag--archived' },
 }
 
+const tableLocale = computed(() => ({
+  emptyText: h('div', { class: 'empty-state' }, [
+    h('div', { class: 'empty-state__icon' }, [h(FileText, { size: 28 })]),
+    h('h3', { class: 'empty-state__title' }, search.value || statusFilter.value ? '没有匹配的模板' : '暂无模板'),
+    h('p', { class: 'empty-state__desc' }, search.value || statusFilter.value ? '试试调整搜索或筛选条件' : '点击右上角「新建模板」开始创建'),
+  ]),
+}))
+
 onMounted(fetchData)
 </script>
 
@@ -141,7 +149,8 @@ onMounted(fetchData)
         </div>
       </header>
 
-      <div class="toolbar">
+      <!-- 工具栏卡片:搜索 + 状态 pill 筛选 -->
+      <div class="toolbar-card">
         <a-input-search
           v-model:value="search"
           placeholder="搜索模板…"
@@ -149,98 +158,127 @@ onMounted(fetchData)
           class="search-input"
           @search="fetchData"
         />
-        <a-select
-          v-model:value="statusFilter"
-          placeholder="全部状态"
-          allow-clear
-          style="width: 140px"
-          @change="fetchData"
-        >
-          <a-select-option value="draft">草稿</a-select-option>
-          <a-select-option value="published">已发布</a-select-option>
-          <a-select-option value="archived">已下线</a-select-option>
-        </a-select>
+        <div class="status-pills">
+          <span
+            class="tag-chip"
+            :class="{ 'tag-chip--selected': !statusFilter }"
+            @click="statusFilter = undefined; fetchData()"
+          >
+            全部
+          </span>
+          <span
+            class="tag-chip"
+            :class="{ 'tag-chip--selected': statusFilter === 'draft' }"
+            @click="statusFilter = 'draft'; fetchData()"
+          >
+            草稿
+          </span>
+          <span
+            class="tag-chip"
+            :class="{ 'tag-chip--selected': statusFilter === 'published' }"
+            @click="statusFilter = 'published'; fetchData()"
+          >
+            已发布
+          </span>
+          <span
+            class="tag-chip"
+            :class="{ 'tag-chip--selected': statusFilter === 'archived' }"
+            @click="statusFilter = 'archived'; fetchData()"
+          >
+            已归档
+          </span>
+        </div>
       </div>
 
-      <a-table
-        :data-source="items"
-        :columns="[
-          { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
-          { title: '标签', key: 'tags', width: 200 },
-          { title: '状态', key: 'status', width: 100 },
-          { title: '使用次数', dataIndex: 'use_count', key: 'use_count', width: 90, align: 'center' },
-          { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 170 },
-          { title: '操作', key: 'action', width: 320 }
-        ]"
-        :pagination="false"
-        :loading="loading"
-        row-key="id"
-        size="middle"
-      >
-        <template #bodyCell="{ column, record }">
-          <template v-if="column.key === 'tags'">
-            <a-tag v-for="t in record.tags?.slice(0, 2)" :key="t.id" size="small">{{ t.name }}</a-tag>
-            <span v-if="record.tags?.length > 2">…</span>
-          </template>
-          <template v-if="column.key === 'status'">
-            <span
-              class="status-tag"
-              :class="STATUS_MAP[record.status]?.cls"
-            >
-              {{ STATUS_MAP[record.status]?.text || record.status }}
-            </span>
-          </template>
-          <template v-if="column.key === 'action'">
-            <a-space>
-              <a-button size="small" @click="goEdit(record.id)">
-                <template #icon><Edit2 :size="14" /></template>
-              </a-button>
-              <a-button size="small" @click="goPreview(record.id)">
-                <template #icon><Eye :size="14" /></template>
-              </a-button>
-              <a-button
-                v-if="record.status === 'draft'"
-                size="small"
-                type="primary"
-                @click="changeStatus(record.id, 'published')"
+      <!-- 表格主题化 + 移动端横向滚动 -->
+      <div class="table-theme table-scroll">
+        <a-table
+          :data-source="items"
+          :columns="[
+            { title: '标题', dataIndex: 'title', key: 'title', ellipsis: true },
+            { title: '标签', key: 'tags', width: 180 },
+            { title: '状态', key: 'status', width: 100 },
+            { title: '使用次数', dataIndex: 'use_count', key: 'use_count', width: 90, align: 'center' },
+            { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 170 },
+            { title: '操作', key: 'action', width: 320 }
+          ]"
+          :pagination="false"
+          :loading="loading"
+          row-key="id"
+          size="middle"
+          :locale="tableLocale"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'tags'">
+              <span v-for="t in record.tags?.slice(0, 2)" :key="t.id" class="card-tag">{{ t.name }}</span>
+              <span v-if="record.tags?.length > 2" class="tag-more">…</span>
+            </template>
+            <template v-if="column.key === 'status'">
+              <span
+                class="status-tag"
+                :class="STATUS_MAP[record.status]?.cls"
               >
-                <template #icon><Check :size="14" /></template>
-                发布
-              </a-button>
-              <a-button
-                v-if="record.status === 'published'"
-                size="small"
-                danger
-                @click="changeStatus(record.id, 'archived')"
-              >
-                下线
-              </a-button>
-              <a-button
-                v-if="record.status === 'archived'"
-                size="small"
-                @click="changeStatus(record.id, 'draft')"
-              >
-                恢复
-              </a-button>
-              <a-tooltip
-                v-if="isSuperAdmin"
-                :title="record.status === 'published'
-                  ? '已发布的模板不能删除,请先下线为「已归档」'
-                  : '物理删除：从数据库移除记录，不可恢复'"
-              >
-                <a-button
-                  size="small"
-                  danger
-                  :disabled="record.status === 'published'"
-                  @click="handleHardDelete(record)"
-                >
-                  删除
+                {{ STATUS_MAP[record.status]?.text || record.status }}
+              </span>
+            </template>
+            <template v-if="column.key === 'action'">
+              <div class="action-group">
+                <!-- 主操作(图标+文字) -->
+                <a-button size="small" class="action-btn-primary" @click="goEdit(record.id)">
+                  <template #icon><Edit2 :size="14" /></template>
+                  <span>编辑</span>
                 </a-button>
-              </a-tooltip>
-            </a-space>
+                <a-button
+                  v-if="record.status === 'draft'"
+                  size="small"
+                  class="action-btn-primary"
+                  @click="changeStatus(record.id, 'published')"
+                >
+                  <template #icon><Check :size="14" /></template>
+                  <span>发布</span>
+                </a-button>
+                <a-button
+                  v-if="record.status === 'published'"
+                  size="small"
+                  class="action-btn-warn"
+                  @click="changeStatus(record.id, 'archived')"
+                >
+                  下线
+                </a-button>
+                <a-button
+                  v-if="record.status === 'archived'"
+                  size="small"
+                  @click="changeStatus(record.id, 'draft')"
+                >
+                  恢复
+                </a-button>
+                <!-- 次操作(仅图标) -->
+                <a-tooltip title="预览">
+                  <a-button size="small" class="action-icon" @click="goPreview(record.id)">
+                    <Eye :size="14" />
+                  </a-button>
+                </a-tooltip>
+                <!-- 危险操作(分隔线 + danger) -->
+                <a-tooltip
+                  v-if="isSuperAdmin"
+                  :title="record.status === 'published'
+                    ? '已发布的模板不能删除,请先下线为「已归档」'
+                    : '物理删除：从数据库移除记录，不可恢复'"
+                >
+                  <a-button
+                    size="small"
+                    class="action-btn-danger"
+                    :disabled="record.status === 'published'"
+                    @click="handleHardDelete(record)"
+                  >
+                    <Trash2 :size="14" />
+                  </a-button>
+                </a-tooltip>
+              </div>
+            </template>
           </template>
-        </template>
-      </a-table>
+        </a-table>
+      </div>
 
       <div v-if="total > pageSize" class="pagination-wrap">
         <a-pagination
@@ -257,22 +295,84 @@ onMounted(fetchData)
 
 <style scoped>
 /* 页面顶部 - 已迁移到全局 .page-bar / .page-bar__title / .page-bar__actions */
-.page-bar__title {
-  font-size: 20px;
-}
-
-.toolbar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-}
 
 .search-input {
-  width: 280px;
+  flex: 1;
+  max-width: 360px;
+}
+
+.status-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+/* 表格外层横向滚动(移动端必备) */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.action-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.action-btn-primary {
+  color: var(--main-700);
+}
+
+.action-btn-primary:hover {
+  color: var(--main-color);
+  background: var(--main-10);
+}
+
+.action-btn-warn {
+  color: var(--color-warning-700);
+}
+
+.action-btn-warn:hover {
+  color: var(--color-warning-900);
+  background: var(--color-warning-50);
+}
+
+.action-btn-danger {
+  color: var(--color-error-600);
+  margin-left: 8px;
+  padding-left: 8px;
+  border-left: 1px solid var(--gray-150);
+}
+
+.action-btn-danger:hover {
+  color: var(--color-error-700);
+  background: var(--color-error-50);
+}
+
+.action-btn-danger:disabled {
+  border-left-color: var(--gray-100);
+}
+
+.action-icon {
+  color: var(--color-text-secondary);
+}
+
+.action-icon:hover {
+  color: var(--main-color);
+  background: var(--main-10);
 }
 
 .pagination-wrap {
-  margin-top: 16px;
-  text-align: center;
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .status-pills {
+    margin-left: 0;
+    width: 100%;
+    overflow-x: auto;
+  }
 }
 </style>

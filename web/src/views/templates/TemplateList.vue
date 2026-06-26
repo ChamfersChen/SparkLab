@@ -2,7 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { Filter, Clock, X } from 'lucide-vue-next'
+import { Filter, Clock, X, FileSearch } from 'lucide-vue-next'
 import { listTemplates } from '@/apis/template_api'
 import { getTagsGrouped } from '@/apis/tag_api'
 
@@ -134,6 +134,12 @@ function onPageChange(p, ps) {
   syncQueryToUrl()
 }
 
+const STATUS_LABEL = {
+  draft: { text: '草稿', cls: 'status-tag--draft' },
+  published: { text: '已发布', cls: 'status-tag--published' },
+  archived: { text: '已归档', cls: 'status-tag--archived' },
+}
+
 const hasActiveFilter = computed(
   () =>
     search.value.trim().length > 0 ||
@@ -191,13 +197,13 @@ onMounted(() => {
       <!-- 顶部:主标题 + 副标题(无返回按钮,无操作区) -->
       <header class="page-bar">
         <div class="page-bar__title-area">
-          <h2 class="page-bar__title">模板库</h2>
+          <h1 class="page-bar__title">模板库</h1>
           <p class="page-bar__sub">浏览可用的提示词模板,找到适合你的开始使用</p>
         </div>
       </header>
 
-      <!-- 搜索 + 排序 -->
-      <div class="toolbar">
+      <!-- 搜索 + 排序 + 筛选 — 工具栏卡片化 -->
+      <div class="toolbar-card">
         <a-input-search
           v-model:value="search"
           placeholder="搜索模板名称或描述…"
@@ -216,11 +222,11 @@ onMounted(() => {
         <a-button
           v-if="hasActiveFilter"
           type="text"
-          class="clear-btn"
+          class="icon-text-btn"
           @click="clearAllFilters"
         >
-          <template #icon><X :size="14" /></template>
-          清除全部
+          <X :size="14" />
+          <span>清除全部</span>
         </a-button>
       </div>
 
@@ -228,24 +234,32 @@ onMounted(() => {
       <div v-if="showFilter" class="filter-panel">
         <div v-for="(tagList, category) in tags" :key="category" class="filter-group">
           <span class="filter-label">{{ { platform: '平台', content_type: '内容类型', industry: '行业/场景' }[category] }}</span>
-          <a-tag
-            v-for="t in tagList"
-            :key="t.id"
-            :color="selectedTagIds.includes(t.id) ? 'blue' : 'default'"
-            style="cursor: pointer; margin: 2px"
-            @click="toggleTag(t.id)"
-          >
-            {{ t.name }}
-          </a-tag>
+          <div class="filter-tags">
+            <span
+              v-for="t in tagList"
+              :key="t.id"
+              class="tag-chip"
+              :class="{ 'tag-chip--selected': selectedTagIds.includes(t.id) }"
+              @click="toggleTag(t.id)"
+            >
+              {{ t.name }}
+            </span>
+          </div>
         </div>
       </div>
 
       <!-- 已选标签 -->
       <div v-if="allSelectedTags.length" class="selected-tags">
         <span class="selected-label">已选：</span>
-        <a-tag v-for="t in allSelectedTags" :key="t.id" closable color="blue" @close="toggleTag(t.id)">
+        <span
+          v-for="t in allSelectedTags"
+          :key="t.id"
+          class="tag-chip tag-chip--selected"
+          @click="toggleTag(t.id)"
+        >
           {{ t.name }}
-        </a-tag>
+          <X :size="12" />
+        </span>
       </div>
 
       <!-- 结果数 -->
@@ -260,16 +274,24 @@ onMounted(() => {
           <div
             v-for="item in items"
             :key="item.id"
-            class="template-card"
+            class="card-base card-hover card-focus template-card"
+            tabindex="0"
             @click="goDetail(item.id)"
+            @keydown.enter="goDetail(item.id)"
           >
             <div class="card-header">
               <h3 class="card-title">{{ item.title }}</h3>
-              <span v-if="item.status === 'published'" class="status-tag status-tag--published">已发布</span>
+              <span
+                v-if="item.status && STATUS_LABEL[item.status]"
+                class="status-tag"
+                :class="STATUS_LABEL[item.status].cls"
+              >
+                {{ STATUS_LABEL[item.status].text }}
+              </span>
             </div>
             <p class="card-desc">{{ item.description }}</p>
-            <div class="card-tags">
-              <a-tag v-for="t in item.tags.slice(0, 3)" :key="t.id" color="default" class="tag-item">{{ t.name }}</a-tag>
+            <div v-if="item.tags?.length" class="card-tags">
+              <span v-for="t in item.tags.slice(0, 3)" :key="t.id" class="card-tag">{{ t.name }}</span>
               <span v-if="item.tags.length > 3" class="tag-more">+{{ item.tags.length - 3 }}</span>
             </div>
             <div class="card-meta">
@@ -281,12 +303,21 @@ onMounted(() => {
           </div>
         </div>
 
-        <a-empty
-          v-else-if="!loading"
-          :description="hasActiveFilter ? '没有找到匹配的模板，试试调整筛选条件' : '暂无可用模板'"
-        >
-          <a-button v-if="hasActiveFilter" type="primary" @click="clearAllFilters">清除筛选</a-button>
-        </a-empty>
+        <!-- 空态:替换 a-empty 为带图标的 .empty-state -->
+        <div v-else-if="!loading" class="empty-state">
+          <div class="empty-state__icon">
+            <FileSearch :size="28" />
+          </div>
+          <h3 class="empty-state__title">
+            {{ hasActiveFilter ? '没有找到匹配的模板' : '暂无可用模板' }}
+          </h3>
+          <p class="empty-state__desc">
+            {{ hasActiveFilter ? '试试调整筛选条件,或清除筛选后查看全部模板' : '管理员发布后,模板会出现在这里' }}
+          </p>
+          <a-button v-if="hasActiveFilter" type="primary" @click="clearAllFilters">
+            清除筛选
+          </a-button>
+        </div>
       </a-spin>
 
       <!-- 分页 -->
@@ -305,32 +336,19 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 页面顶部 - 已迁移到全局 .page-bar / .page-bar__title / .page-bar__sub */
-.page-bar__title {
-  font-size: 20px;
-}
-
-.toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 16px;
-}
+/* 页面顶部 .page-bar__title 用全局 24px(已对齐 design.md),不再局部覆盖 */
 
 .search-input {
   flex: 1;
   max-width: 480px;
-}
-
-.clear-btn {
-  color: var(--gray-600);
+  min-width: 200px;
 }
 
 .filter-panel {
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
   border-radius: 8px;
-  padding: 16px;
+  padding: 20px 24px;
   margin-bottom: 16px;
 }
 
@@ -338,50 +356,67 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 8px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--gray-100);
 }
 
 .filter-group:last-child {
   border-bottom: none;
+  padding-bottom: 0;
+}
+
+.filter-group:first-child {
+  padding-top: 0;
 }
 
 .filter-label {
   flex-shrink: 0;
   width: 80px;
   font-size: 13px;
-  color: var(--gray-700);
+  color: var(--color-text);
   font-weight: 500;
-  padding-top: 4px;
+  padding-top: 6px;
+}
+
+.filter-tags {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .selected-tags {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
   margin-bottom: 12px;
 }
 
 .selected-label {
   font-size: 13px;
-  color: var(--gray-600);
+  color: var(--color-text-secondary);
   margin-right: 4px;
+}
+
+.selected-tags .tag-chip {
+  gap: 6px;
+  padding: 4px 8px 4px 12px;
 }
 
 .result-summary {
   font-size: 13px;
-  color: var(--gray-600);
+  color: var(--color-text-secondary);
   margin: 4px 0 16px;
 }
 
 .result-summary strong {
-  color: var(--gray-900);
+  color: var(--color-text);
   font-weight: 600;
 }
 
 .filter-hint {
-  color: var(--main-500);
+  color: var(--main-600);
   margin-left: 4px;
 }
 
@@ -391,17 +426,11 @@ onMounted(() => {
   gap: 16px;
 }
 
+/* 卡片视觉用全局 .card-base / .card-hover / .card-focus,只补模板特化 */
 .template-card {
-  background: var(--gray-0);
-  border: 1px solid var(--gray-150);
-  border-radius: 8px;
-  padding: 20px;
-  cursor: pointer;
-  transition: background-color 0.15s ease;
-}
-
-.template-card:hover {
-  background: var(--gray-25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .card-header {
@@ -409,27 +438,22 @@ onMounted(() => {
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
-  margin-bottom: 8px;
 }
 
 .card-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--gray-900);
+  color: var(--color-text);
   margin: 0;
   line-height: 1.4;
   flex: 1;
 }
 
-.status-tag {
-  flex-shrink: 0;
-}
-
 .card-desc {
   font-size: 13px;
-  color: var(--gray-600);
-  line-height: 1.5;
-  margin: 0 0 12px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -440,18 +464,25 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 12px;
-  min-height: 22px;
+  gap: 6px;
+  min-height: 24px;
 }
 
-.tag-item {
-  margin: 0;
+.card-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  background: var(--gray-10);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .tag-more {
   font-size: 12px;
-  color: var(--gray-500);
+  color: var(--color-text-tertiary);
+  padding-left: 2px;
 }
 
 .card-meta {
@@ -459,7 +490,10 @@ onMounted(() => {
   align-items: center;
   gap: 12px;
   font-size: 12px;
-  color: var(--gray-500);
+  color: var(--color-text-tertiary);
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--gray-100);
 }
 
 .meta-item {
@@ -472,5 +506,23 @@ onMounted(() => {
   margin-top: 24px;
   display: flex;
   justify-content: center;
+}
+
+@media (max-width: 768px) {
+  .search-input {
+    max-width: none;
+  }
+  .template-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .filter-group {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .filter-label {
+    width: auto;
+    padding-top: 0;
+  }
 }
 </style>

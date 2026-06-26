@@ -147,7 +147,7 @@ onMounted(fetchData)
           <!-- 顶部:图标+返回+标题(左),状态+使用量+发布时间(右) -->
           <header class="page-bar page-bar--detail">
             <div class="page-bar__left-group">
-              <FileText :size="20" class="page-bar__icon" />
+              <!-- <FileText :size="20" class="page-bar__icon" /> -->
               <button type="button" class="icon-text-btn" @click="goBack">
                 <ChevronLeft :size="16" />
                 <span>返回</span>
@@ -256,7 +256,7 @@ onMounted(fetchData)
 
           <!-- 底部:次操作(返回) -->
           <footer class="page-footer">
-            <a-button @click="goBack">返回</a-button>
+            <a-button @click="goBack">返回模板库</a-button>
           </footer>
         </template>
       </a-spin>
@@ -352,6 +352,17 @@ onMounted(fetchData)
 .cta-btn {
   min-width: 200px;
   font-weight: 500;
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.15);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.cta-btn:hover {
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.28);
+}
+
+.cta-btn:focus-visible {
+  outline: 2px solid var(--main-200);
+  outline-offset: 2px;
 }
 
 .cta-hint {
@@ -384,6 +395,12 @@ onMounted(fetchData)
   border-radius: 8px;
   padding: 20px 24px;
   margin-bottom: 16px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.section:hover {
+  border-color: var(--gray-200);
+  box-shadow: var(--shadow-sm);
 }
 
 .section-title {
@@ -426,14 +443,13 @@ onMounted(fetchData)
   margin: 0;
 }
 
-/* 段卡左侧加 4px 主色条,符合「背景+边框」轻量层级 */
-.section--role,
-.section--goal,
-.section--input,
-.section--output,
-.section--example {
-  border-left: 4px solid var(--main-color);
-}
+/* 段卡左侧 4px 语义色条,五段差异化(role/goal/input/output/example)
+   info=稳定身份 / accent=目标强调 / warning=需填写 / main=主操作 / success=完成参考 */
+.section--role { border-left: 4px solid var(--color-info-500); }
+.section--goal { border-left: 4px solid var(--color-accent-500); }
+.section--input { border-left: 4px solid var(--color-warning-500); }
+.section--output { border-left: 4px solid var(--main-color); }
+.section--example { border-left: 4px solid var(--color-success-500); }
 
 .section--vars {
   border-left: 4px solid var(--main-500);
@@ -543,7 +559,7 @@ onMounted(fetchData)
   }
   .section {
     padding: 16px;
-    border-radius: 0;
+    border-radius: 4px;
   }
   .primary-cta {
     flex-direction: column;

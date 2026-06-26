@@ -82,3 +82,396 @@
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
 }
+
+/* ==========================================================================
+ * 状态标签通用类（参考 docs/design.md §状态标签）
+ * - draft     草稿     --gray-100 背景 + --gray-600 文字
+ * - published 已发布   --color-success-50 背景 + --color-success-700 文字
+ * - archived  已归档   --color-warning-50 背景 + --color-warning-900 文字
+ * 圆角 999px、文字 12px
+ * ========================================================================== */
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.status-tag--draft {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.status-tag--published {
+  background: var(--color-success-50);
+  color: var(--color-success-700);
+}
+
+.status-tag--archived {
+  background: var(--color-warning-50);
+  color: var(--color-warning-900);
+}
+
+/* 激活码状态(用于 ActivationCodeManage)
+ * - unused  未使用  success 绿
+ * - used    已使用  普通灰
+ * - disabled 已禁用  error 红
+ */
+.status-tag--unused {
+  background: var(--color-success-50);
+  color: var(--color-success-700);
+}
+
+.status-tag--used {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+
+.status-tag--disabled {
+  background: var(--color-error-50);
+  color: var(--color-error-700);
+}
+
+/* ==========================================================================
+ * 页面骨架（参考 docs/design.md §6 深度与层级）
+ *
+ * 借鉴 Yuxi DataBaseInfoView 的 .database-info-container + .database-detail-body
+ * 「页面灰背景 + 内容白卡」分层,但不引入 Yuxi 的 tabs 模式（业务不匹配）。
+ *
+ * - .page-bg:        页面级背景 = --gray-10（次级背景，与 design.md 311 一致）
+ * - .page-content:   内容容器，水平居中 + 24/32px 边距 + 上下 padding
+ * - .page-bar:       顶部条 = 返回 + 标题区 + 操作区（Yuxi .detail-top-bar 简化版）
+ *   - .page-bar__back:   返回按钮
+ *   - .page-bar__title:  主标题（24px/600）
+ *   - .page-bar__sub:    副标题/描述（14px/--color-text-secondary）
+ * - .panel:          内容卡片 = --gray-0 + 1px --gray-150 + 8px 圆角 + 20/24px padding
+ *   - .panel--flush:   无 padding（用于内部放带 padding 的子区块）
+ * - .page-footer:    页脚分隔（用于底部操作按钮）
+ * ========================================================================== */
+.page-bg {
+  min-height: 100vh;
+  background: var(--gray-10);
+  padding-bottom: 64px;
+}
+
+.page-content {
+  /* 内容容器：100% 铺满，不限宽；用内边距让内容不贴边。
+   * 详情/填写型页面里若需要限制单块内容宽度，由具体 block 自己加 max-width + margin auto。 */
+  width: 100%;
+  padding: 24px 32px;
+}
+
+.page-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.page-bar__back {
+  /* 文本按钮形态，hover 主色；align-self: center 保证多行 title-area 时按钮仍垂直居中 */
+  align-self: center;
+  margin-right: 4px;
+  color: var(--gray-600);
+  padding-left: 0;
+}
+
+.page-bar__back:hover {
+  color: var(--main-color);
+  background: transparent;
+}
+
+/* ==========================================================================
+ * 图标+文字按钮：垂直居中基线统一（替代 a-button 的不对齐问题）
+ *
+ * a-button 在 type="text" 时内部 icon 和文字 align 不可控，与 page-bar 内
+ * 多行 title-area 视觉不齐。统一用裸 <button> + lucide icon + 文字，
+ * 强制 inline-flex + align-items: center。
+ * ========================================================================== */
+.icon-text-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--gray-600);
+  font-size: 14px;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.icon-text-btn:hover {
+  color: var(--main-color);
+  background: var(--main-10);
+}
+
+.icon-text-btn:focus-visible {
+  outline: 2px solid var(--main-200);
+  outline-offset: 2px;
+}
+
+.icon-text-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.icon-text-btn svg {
+  flex-shrink: 0;
+}
+
+.page-bar__title-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.page-bar__title {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0 0 4px;
+  line-height: 1.4;
+}
+
+.page-bar__sub {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 720px;
+}
+
+.page-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.panel {
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
+  padding: 20px 24px;
+}
+
+.panel + .panel {
+  margin-top: 16px;
+}
+
+.panel--flush {
+  padding: 0;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.panel-title-icon {
+  color: var(--main-color);
+}
+
+.page-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-100);
+}
+
+@media (max-width: 768px) {
+  .page-content {
+    padding: 16px;
+  }
+  .panel {
+    padding: 16px;
+  }
+  .page-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .page-bar__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* ==========================================================================
+ * 视觉工具类（5 个 Template 视图统一引用）
+ * - .card-base / .card-hover / .card-focus: 通用卡片及交互态
+ * - .empty-state: 空态容器(图标 + 文案 + CTA)
+ * - .toolbar-card: 工具栏卡片容器
+ * - .table-theme: a-table SparkLab 主题化（:deep 选择器）
+ * - .tag-chip: 标签 chip 选中态
+ * - .hint-card: 变量输入/提示容器
+ * ========================================================================== */
+.card-base {
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
+  padding: 20px 24px;
+  transition: border-color 0.15s ease, background-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.card-hover {
+  cursor: pointer;
+}
+
+.card-hover:hover {
+  border-color: var(--main-color);
+  background: var(--main-10);
+  box-shadow: var(--shadow-sm);
+}
+
+.card-focus:focus-visible {
+  outline: 2px solid var(--main-200);
+  outline-offset: 2px;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 64px 24px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.empty-state__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--gray-25);
+  color: var(--main-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.empty-state__title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0 0 4px;
+}
+
+.empty-state__desc {
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  margin: 0 0 20px;
+  max-width: 360px;
+  line-height: 1.6;
+}
+
+.toolbar-card {
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.table-theme {
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table-theme :deep(.ant-table-thead > tr > th) {
+  background: var(--gray-10) !important;
+  color: var(--color-text) !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  border-bottom: 1px solid var(--gray-150) !important;
+}
+
+.table-theme :deep(.ant-table-tbody > tr > td) {
+  border-bottom: 1px solid var(--gray-100) !important;
+  font-size: 14px;
+}
+
+.table-theme :deep(.ant-table-tbody > tr:hover > td) {
+  background: var(--gray-25) !important;
+}
+
+.table-theme :deep(.ant-table-tbody > tr:last-child > td) {
+  border-bottom: none !important;
+}
+
+.table-theme :deep(.ant-empty) {
+  padding: 48px 24px;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  background: var(--gray-10);
+  color: var(--gray-700);
+  border: 1px solid var(--gray-150);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.tag-chip:hover {
+  border-color: var(--main-color);
+  color: var(--main-color);
+}
+
+.tag-chip--selected {
+  background: var(--main-10);
+  border-color: var(--main-color);
+  color: var(--main-700);
+}
+
+.hint-card {
+  background: var(--gray-10);
+  border: 1px solid var(--gray-100);
+  border-radius: 6px;
+  padding: 12px 16px;
+}
+
+@media (max-width: 768px) {
+  .toolbar-card {
+    padding: 12px;
+    gap: 8px;
+  }
+}

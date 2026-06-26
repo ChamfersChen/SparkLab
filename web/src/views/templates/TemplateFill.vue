@@ -222,7 +222,7 @@ onMounted(fetchData)
           <!-- 顶部:图标+返回+标题 -->
           <header class="page-bar page-bar--fill">
             <div class="page-bar__left-group">
-              <FileText :size="20" class="page-bar__icon" />
+              <!-- <FileText :size="20" class="page-bar__icon" /> -->
               <button type="button" class="icon-text-btn" @click="goBack">
                 <ChevronLeft :size="16" />
                 <span>返回</span>
@@ -593,14 +593,23 @@ onMounted(fetchData)
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid var(--gray-100);
+  margin: 16px -24px -20px; /* 撑到 panel 边缘 */
+  padding: 16px 24px;
+  background: var(--gray-10);
+  border-top: 1px solid var(--gray-150);
+  border-bottom-left-radius: 8px;
+  border-bottom-right-radius: 8px;
 }
 
 .generate-btn {
   flex: 1;
   font-weight: 500;
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.15);
+  transition: box-shadow 0.15s ease;
+}
+
+.generate-btn:not(:disabled):hover {
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.28);
 }
 
 .reset-btn {
@@ -645,22 +654,23 @@ onMounted(fetchData)
 }
 
 .platform-chip {
-  /* chip 形态:中性边框 + hover 主色,符合 design.md 「工具栏按钮」规范 */
+  /* chip 形态:中性边框 + hover 仅改背景,克制感 */
   background: var(--gray-0);
   border-color: var(--gray-150);
   color: var(--color-text);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .platform-chip:hover {
-  border-color: var(--main-color);
-  color: var(--main-color);
   background: var(--main-10);
+  border-color: var(--main-200);
+  color: var(--main-700);
 }
 
 .preview-area {
   background: var(--gray-10);
   border: 1px solid var(--gray-150);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 16px;
   min-height: 320px;
 }
@@ -687,8 +697,9 @@ onMounted(fetchData)
 }
 
 .preview-placeholder-icon {
-  color: var(--gray-200);
+  color: var(--main-500);
   margin-bottom: 12px;
+  opacity: 0.6;
 }
 
 .preview-placeholder p {

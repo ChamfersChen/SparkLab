@@ -1,14 +1,35 @@
 <script setup>
+/**
+ * 模板详情预览页（用户端）。
+ *
+ * 布局参考 docs/design.md：
+ * - 顶部：面包屑(返回) + 状态徽标 + 标题 + 描述 + 标签
+ * - 中部：五段式段卡(Role / Goal / Input / Output / Example),统一卡片样式
+ * - 下方：变量填写区(variable_hints 完整呈现)
+ * - 底部：主 CTA「立即使用」+ 次操作「返回模板库」
+ *
+ * 变量来源 = input 段提取 ∪ variable_hints 的 key,避免 hints 有但 input 没用上时被吞。
+ */
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { ArrowRight, Star, Clock, FileText, Eye } from 'lucide-vue-next'
-import { useUserStore } from '@/stores/user'
+import {
+  ArrowRight,
+  ChevronLeft,
+  Clock,
+  User,
+  FileText,
+  Sparkles,
+  Target,
+  PenLine,
+  ListChecks,
+  Eye,
+} from 'lucide-vue-next'
 import { getTemplate } from '@/apis/template_api'
+import { extractVariables } from '@/composables/useTemplateVariables'
 
 const route = useRoute()
 const router = useRouter()
-const userStore = useUserStore()
 
 const loading = ref(false)
 const template = ref(null)
@@ -20,7 +41,7 @@ async function fetchData() {
     template.value = res
   } catch (e) {
     if (e.response?.status === 404) {
-      message.error('模板不存在')
+      message.error('模板已下架或不存在')
       router.replace({ name: 'templates' })
     } else if (e.response?.status !== 401) {
       message.error('获取模板详情失败')
@@ -34,91 +55,209 @@ function goFill() {
   router.push({ name: 'template-fill', params: { id: route.params.id } })
 }
 
-// 从 input 段提取变量
+function goBack() {
+  router.push({ name: 'templates' })
+}
+
+// 变量来源 = input 段 ∪ variable_hints 的 key
 const variables = computed(() => {
   if (!template.value) return []
-  const regex = /\{\{(.*?)\}\}/g
-  const vars = []
+  const inputVars = extractVariables(template.value.input)
+  const hintKeys = Object.keys(template.value.variable_hints || {})
   const seen = new Set()
-  let match
-  while ((match = regex.exec(template.value.input)) !== null) {
-    if (!seen.has(match[1])) {
-      seen.add(match[1])
-      vars.push({
-        name: match[1],
-        hint: template.value.variable_hints?.[match[1]] || null
+  const merged = []
+  for (const v of [...inputVars, ...hintKeys]) {
+    if (!seen.has(v)) {
+      seen.add(v)
+      merged.push({
+        name: v,
+        hint: template.value.variable_hints?.[v] || null,
+        usedInInput: inputVars.includes(v),
       })
     }
   }
-  return vars
+  return merged
+})
+
+const STATUS_LABEL = {
+  draft: { text: '草稿', cls: 'status-tag--draft' },
+  published: { text: '已发布', cls: 'status-tag--published' },
+  archived: { text: '已归档', cls: 'status-tag--archived' },
+}
+
+// 五段式定义,顺序固定;按 data 是否非空决定是否渲染
+const sections = computed(() => {
+  if (!template.value) return []
+  const t = template.value
+  return [
+    {
+      key: 'role',
+      icon: User,
+      label: 'Role · 角色定义',
+      tone: 'role',
+      content: t.role,
+    },
+    {
+      key: 'goal',
+      icon: Target,
+      label: 'Goal · 目标说明',
+      tone: 'goal',
+      content: t.goal,
+    },
+    {
+      key: 'input',
+      icon: PenLine,
+      label: 'Input · 变量定义',
+      tone: 'input',
+      content: t.input,
+      note: variables.value.length
+        ? `共 ${variables.value.length} 个变量，使用 {{变量名}} 语法`
+        : '无变量,可直接生成提示词',
+    },
+    {
+      key: 'output',
+      icon: ListChecks,
+      label: 'Output · 输出要求',
+      tone: 'output',
+      content: t.output,
+    },
+    {
+      key: 'example',
+      icon: Eye,
+      label: 'Example · 示例效果',
+      tone: 'example',
+      content: t.example,
+    },
+  ]
+})
+
+const createdAtText = computed(() => {
+  if (!template.value?.created_at) return ''
+  return new Date(template.value.created_at).toLocaleDateString('zh-CN')
 })
 
 onMounted(fetchData)
 </script>
 
 <template>
-  <div class="page">
-    <div class="content">
+  <div class="page-bg">
+    <div class="page-content">
       <a-spin :spinning="loading">
         <template v-if="template">
-          <a-page-header
-            title="返回模板库"
-            @back="router.push({ name: 'templates' })"
-          />
-
-          <div class="detail-layout">
-            <!-- 左侧主信息 -->
-            <div class="detail-main">
-              <h1 class="detail-title">{{ template.title }}</h1>
-              <p class="detail-desc">{{ template.description }}</p>
-
-              <!-- 标签 -->
-              <div class="detail-tags">
-                <a-tag v-for="t in template.tags" :key="t.id" color="blue">{{ t.name }}</a-tag>
-              </div>
-
-              <!-- 需要填写的信息 -->
-              <section class="section">
-                <h2 class="section-title">
-                  <FileText :size="18" />
-                  需要填写的信息
-                </h2>
-                <div v-if="variables.length" class="variable-list">
-                  <div v-for="v in variables" :key="v.name" class="variable-item">
-                    <div class="var-name">{{ v.name }}</div>
-                    <div v-if="v.hint" class="var-hint">{{ v.hint }}</div>
-                    <div v-else class="var-hint muted">填写 {{ v.name }}</div>
-                  </div>
-                </div>
-                <div v-else class="no-vars">此模板无需填写变量，可直接生成提示词。</div>
-              </section>
-
-              <!-- 示例效果 -->
-              <section class="section">
-                <h2 class="section-title">
-                  <Eye :size="18" />
-                  示例效果
-                </h2>
-                <div class="example-box">
-                  <pre class="example-text">{{ template.example }}</pre>
-                </div>
-              </section>
+          <!-- 顶部:图标+返回+标题(左),状态+使用量+发布时间(右) -->
+          <header class="page-bar page-bar--detail">
+            <div class="page-bar__left-group">
+              <FileText :size="20" class="page-bar__icon" />
+              <button type="button" class="icon-text-btn" @click="goBack">
+                <ChevronLeft :size="16" />
+                <span>返回</span>
+              </button>
+              <h1 class="page-bar__title">{{ template.title }}</h1>
             </div>
-
-            <!-- 右侧边栏 -->
-            <div class="detail-sidebar">
-              <div class="sidebar-card">
-                <div class="sidebar-stat">
-                  <Clock :size="16" />
-                  <span>{{ template.use_count || 0 }} 次使用</span>
-                </div>
-                <a-button type="primary" size="large" block class="cta-btn" @click="goFill">
-                  <template #icon><ArrowRight :size="16" /></template>
-                  填写信息生成提示词
-                </a-button>
-              </div>
+            <div class="page-bar__right-meta">
+              <span
+                v-if="STATUS_LABEL[template.status]"
+                class="status-tag"
+                :class="STATUS_LABEL[template.status].cls"
+              >
+                {{ STATUS_LABEL[template.status].text }}
+              </span>
+              <span class="meta-item">
+                <Clock :size="14" />
+                {{ template.use_count || 0 }} 次使用
+              </span>
+              <span v-if="createdAtText" class="meta-item">
+                <FileText :size="14" />
+                {{ createdAtText }} 发布
+              </span>
             </div>
+          </header>
+
+          <p v-if="template.description" class="page-bar__sub page-bar__sub--detail">{{ template.description }}</p>
+
+          <div v-if="template.tags?.length" class="hero-tags">
+            <a-tag v-for="t in template.tags" :key="t.id" class="hero-tag">{{ t.name }}</a-tag>
           </div>
+
+          <!-- 主操作区(放 hero 之下,内容之上,符合「主操作靠近内容」) -->
+          <div class="primary-cta">
+            <a-button
+              type="primary"
+              size="large"
+              class="cta-btn"
+              @click="goFill"
+            >
+              <template #icon><Sparkles :size="16" /></template>
+              立即使用此模板
+            </a-button>
+            <span class="cta-hint">
+              <ArrowRight :size="14" />
+              填写 {{ variables.length }} 个变量,生成可直接粘贴的 Prompt
+            </span>
+          </div>
+
+          <!-- 主体:左侧内容(五段式 + 变量) -->
+          <div class="detail-layout">
+            <main class="detail-main">
+              <!-- 五段式卡片 -->
+              <section
+                v-for="s in sections"
+                :key="s.key"
+                class="section"
+                :class="`section--${s.tone}`"
+              >
+                <h2 class="section-title">
+                  <component :is="s.icon" :size="18" class="section-icon" />
+                  {{ s.label }}
+                </h2>
+                <p
+                  v-if="s.note"
+                  class="section-note"
+                >
+                  {{ s.note }}
+                </p>
+                <div class="section-body">
+                  <pre class="section-text">{{ s.content }}</pre>
+                </div>
+              </section>
+
+              <!-- 变量填写提示 -->
+              <section v-if="variables.length" class="section section--vars">
+                <h2 class="section-title">
+                  <FileText :size="18" class="section-icon" />
+                  需要填写的信息
+                  <span class="section-badge">{{ variables.length }} 项</span>
+                </h2>
+                <ul class="var-list">
+                  <li
+                    v-for="v in variables"
+                    :key="v.name"
+                    class="var-item"
+                  >
+                    <div class="var-row">
+                      <span class="var-name">{{ v.name }}</span>
+                      <span
+                        v-if="!v.usedInInput"
+                        class="var-pill"
+                        title="该变量在 Input 段未通过 {{}} 引用,仅作为提示项"
+                      >
+                        仅提示
+                      </span>
+                    </div>
+                    <p v-if="v.hint" class="var-hint">{{ v.hint }}</p>
+                    <p v-else class="var-hint var-hint--empty">
+                      填写 {{ v.name }}
+                    </p>
+                  </li>
+                </ul>
+              </section>
+            </main>
+          </div>
+
+          <!-- 底部:次操作(返回) -->
+          <footer class="page-footer">
+            <a-button @click="goBack">返回</a-button>
+          </footer>
         </template>
       </a-spin>
     </div>
@@ -126,21 +265,109 @@ onMounted(fetchData)
 </template>
 
 <style scoped>
-.page {
-  min-height: 100vh;
-  background: var(--gray-10);
+/* ==========================================================================
+ * 页面骨架 - 已迁移到全局 .page-bg / .page-content / .page-bar
+ * Hero 内部块(.hero-meta / .meta-item / .hero-tags / .hero-tag) 保留在组件内
+ * ========================================================================== */
+
+/* ==========================================================================
+ * 覆盖全局 .page-content 左右内边距,让内容铺满
+ * ========================================================================== */
+.page-content {
+  padding: 24px 0;
 }
 
-.content {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 0 32px 64px;
+.page-bar__title {
+  font-size: 20px;
 }
 
+/* ==========================================================================
+ * 顶部栏
+ * ========================================================================== */
+.page-bar--detail {
+  padding: 0 24px;
+}
+
+.page-bar__left-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-bar__icon {
+  color: var(--main-color);
+  flex-shrink: 0;
+}
+
+.page-bar__right-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  color: var(--gray-600);
+  font-size: 13px;
+}
+
+.page-bar__sub--detail {
+  padding: 0 24px;
+  margin-bottom: 16px;
+}
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 24px;
+  margin-bottom: 24px;
+}
+
+.hero-tag {
+  background: var(--main-10);
+  border-color: var(--main-30);
+  color: var(--main-700);
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ==========================================================================
+ * 主操作区
+ * ========================================================================== */
+.primary-cta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 20px 24px;
+  background: var(--main-10);
+  border: 1px solid var(--main-30);
+  border-left: none;
+  border-right: none;
+  margin-bottom: 24px;
+}
+
+.cta-btn {
+  min-width: 200px;
+  font-weight: 500;
+}
+
+.cta-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--gray-600);
+  font-size: 13px;
+}
+
+/* ==========================================================================
+ * 主体布局
+ * ========================================================================== */
 .detail-layout {
   display: flex;
-  gap: 32px;
-  margin-top: 8px;
+  gap: 24px;
 }
 
 .detail-main {
@@ -148,34 +375,15 @@ onMounted(fetchData)
   min-width: 0;
 }
 
-.detail-sidebar {
-  width: 300px;
-  flex-shrink: 0;
-}
-
-.detail-title {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0 0 8px;
-}
-
-.detail-desc {
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-  margin: 0 0 16px;
-}
-
-.detail-tags {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  margin-bottom: 24px;
-}
-
+/* ==========================================================================
+ * 段卡片(五段式 + 变量)
+ * ========================================================================== */
 .section {
-  margin-bottom: 24px;
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
 }
 
 .section-title {
@@ -185,100 +393,169 @@ onMounted(fetchData)
   font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
-  margin: 0 0 12px;
+  margin: 0 0 8px;
 }
 
-.variable-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.section-icon {
+  color: var(--main-color);
+  flex-shrink: 0;
 }
 
-.variable-item {
-  background: var(--gray-0);
-  border: 1px solid var(--gray-50);
-  border-radius: 8px;
-  padding: 12px 16px;
-}
-
-.var-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-bottom: 4px;
-}
-
-.var-hint {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  line-height: 1.5;
-}
-
-.var-hint.muted {
+.section-note {
+  font-size: 12px;
   color: var(--color-text-tertiary);
-  font-style: italic;
+  margin: 0 0 12px;
+  padding-left: 26px; /* 与图标对齐 */
 }
 
-.no-vars {
-  font-size: 14px;
-  color: var(--color-text-secondary);
+.section-body {
+  background: var(--gray-10);
+  border: 1px solid var(--gray-100);
+  border-radius: 6px;
   padding: 16px;
-  background: var(--gray-0);
-  border-radius: 8px;
-  border: 1px dashed var(--gray-50);
+  margin-top: 4px;
 }
 
-.example-box {
-  background: var(--gray-0);
-  border: 1px solid var(--gray-50);
-  border-radius: 8px;
-  padding: 16px;
-}
-
-.example-text {
+.section-text {
   font-family: var(--font-mono);
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.7;
   color: var(--color-text);
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
 }
 
-/* Sidebar */
-.sidebar-card {
-  background: var(--gray-0);
-  border: 1px solid var(--gray-50);
-  border-radius: 10px;
-  padding: 20px;
-  position: sticky;
-  top: 88px;
+/* 段卡左侧加 4px 主色条,符合「背景+边框」轻量层级 */
+.section--role,
+.section--goal,
+.section--input,
+.section--output,
+.section--example {
+  border-left: 4px solid var(--main-color);
 }
 
-.sidebar-stat {
+.section--vars {
+  border-left: 4px solid var(--main-500);
+}
+
+.section-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+  padding: 2px 8px;
+  background: var(--main-10);
+  color: var(--main-700);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ==========================================================================
+ * 变量列表
+ * ========================================================================== */
+.var-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.var-item {
+  background: var(--gray-10);
+  border: 1px solid var(--gray-100);
+  border-radius: 6px;
+  padding: 12px 16px;
+}
+
+.var-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
-  color: var(--color-text-secondary);
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 
-.cta-btn {
+.var-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+}
+
+.var-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  padding: 1px 8px;
+  background: var(--color-warning-50);
+  color: var(--color-warning-900);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
 }
 
+.var-hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.var-hint--empty {
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+/* ==========================================================================
+ * 底部 footer
+ * ========================================================================== */
+.page-footer {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+  padding: 24px 24px 0;
+  border-top: 1px solid var(--gray-100);
+}
+
+/* ==========================================================================
+ * 响应式
+ * ========================================================================== */
 @media (max-width: 768px) {
-  .detail-layout {
-    flex-direction: column;
+  .page-content {
+    padding: 16px 0;
   }
-  .detail-sidebar {
+  .page-bar--detail {
+    padding: 0 16px;
+  }
+  .page-bar__left-group {
+    flex-wrap: wrap;
+  }
+  .page-bar__right-meta {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .page-bar__sub--detail {
+    padding: 0 16px;
+  }
+  .hero-tags {
+    padding: 0 16px;
+  }
+  .section {
+    padding: 16px;
+    border-radius: 0;
+  }
+  .primary-cta {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .cta-btn {
+    min-width: 0;
     width: 100%;
   }
-  .content {
-    padding: 0 16px 48px;
+  .page-footer {
+    padding: 16px 16px 0;
   }
 }
 </style>

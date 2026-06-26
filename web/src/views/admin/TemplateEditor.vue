@@ -5,10 +5,11 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { Sparkles, Plus, Save } from 'lucide-vue-next'
+import { ChevronLeft, Plus, Save, FileText } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { adminCreateTemplate, adminUpdateTemplate, adminGetTemplate } from '@/apis/template_api'
 import { getTagsGrouped } from '@/apis/tag_api'
+import { extractVariables, validateHintsCoverage } from '@/composables/useTemplateVariables'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,7 +23,7 @@ const isEdit = computed(() => !!route.params.id)
 const loading = ref(false)
 const saving = ref(false)
 
-// 表单
+// 表单（form.value.tag_ids 作为标签选择的唯一可信源,不再有 selectedTagIds 副本）
 const form = ref({
   title: '',
   description: '',
@@ -38,24 +39,9 @@ const form = ref({
 
 // 标签数据
 const tags = ref({ platform: [], content_type: [], industry: [] })
-const selectedTagIds = ref([])
 
 // 变量提取
 const extractedVars = ref([])
-
-function extractVariables(text) {
-  const regex = /\{\{(.*?)\}\}/g
-  const vars = []
-  const seen = new Set()
-  let match
-  while ((match = regex.exec(text)) !== null) {
-    if (!seen.has(match[1])) {
-      seen.add(match[1])
-      vars.push(match[1])
-    }
-  }
-  return vars
-}
 
 function onInputChange() {
   extractedVars.value = extractVariables(form.value.input)
@@ -76,25 +62,28 @@ function onInputChange() {
 // 监听 input 变更
 watch(() => form.value.input, onInputChange)
 
-// 标签选择
+// 标签选择(单一可信源: form.value.tag_ids)
 function toggleTag(tagId) {
-  const idx = selectedTagIds.value.indexOf(tagId)
+  const idx = form.value.tag_ids.indexOf(tagId)
   if (idx >= 0) {
-    selectedTagIds.value.splice(idx, 1)
+    form.value.tag_ids.splice(idx, 1)
   } else {
-    selectedTagIds.value.push(tagId)
+    form.value.tag_ids.push(tagId)
   }
 }
 
 function isTagSelected(tagId) {
-  return selectedTagIds.value.includes(tagId)
+  return form.value.tag_ids.includes(tagId)
 }
 
 async function fetchTags() {
   try {
     tags.value = await getTagsGrouped()
-  } catch {
-    // 不阻塞
+  } catch (e) {
+    // 标签加载失败要明示,否则编辑器里「标签配置」会空白,用户没法选 tag
+    if (e?.response?.status !== 401) {
+      message.error('标签加载失败,请先在「标签管理」中确认已配置')
+    }
   }
 }
 
@@ -103,7 +92,8 @@ async function fetchTemplate() {
   loading.value = true
   try {
     const t = await adminGetTemplate(route.params.id)
-    form.value = {
+    // 用 Object.assign 保留 ref 引用,避免断 watch(() => form.value.input)
+    Object.assign(form.value, {
       title: t.title,
       description: t.description,
       role: t.role,
@@ -111,11 +101,10 @@ async function fetchTemplate() {
       input: t.input,
       output: t.output,
       example: t.example,
-      variable_hints: t.variable_hints || {},
-      tag_ids: t.tags?.map(x => x.id) || [],
-      status: t.status
-    }
-    selectedTagIds.value = t.tags?.map(x => x.id) || []
+      variable_hints: { ...(t.variable_hints || {}) },
+      tag_ids: [...(t.tags?.map((x) => x.id) || [])],
+      status: t.status,
+    })
     onInputChange()
   } catch {
     message.error('获取模板信息失败')
@@ -126,7 +115,7 @@ async function fetchTemplate() {
 }
 
 async function handleSave(publish = false) {
-  // 校验
+  // 基础校验
   if (!form.value.title.trim()) { message.warning('请输入模板标题'); return }
   if (!form.value.description.trim()) { message.warning('请输入模板描述'); return }
   if (!form.value.role.trim() || !form.value.goal.trim() || !form.value.input.trim() || !form.value.output.trim() || !form.value.example.trim()) {
@@ -134,18 +123,51 @@ async function handleSave(publish = false) {
     return
   }
 
-  saving.value = true
-  const payload = {
-    ...form.value,
-    tag_ids: selectedTagIds.value,
-    status: publish ? 'published' : form.value.status
-  }
   // 清理空 hints
   const cleanHints = {}
-  for (const [k, v] of Object.entries(payload.variable_hints || {})) {
+  for (const [k, v] of Object.entries(form.value.variable_hints || {})) {
     if (v && v.trim()) cleanHints[k] = v.trim()
   }
-  payload.variable_hints = Object.keys(cleanHints).length ? cleanHints : null
+  const hintsPayload = Object.keys(cleanHints).length ? cleanHints : null
+
+  // 变量覆盖校验:Input 段出现的 {{变量}} 必须都在 variable_hints 里
+  const missingVars = validateHintsCoverage(form.value.input, hintsPayload)
+  if (missingVars.length) {
+    message.warning(`Input 段有变量未配置提示：${missingVars.join('、')}`)
+    return
+  }
+
+  // 状态策略:
+  // - "保存并发布": 强制 published
+  // - "保存草稿":
+  //     - 新建模板: 落 draft
+  //     - 编辑现有: draft 保持 draft;archived 恢复到 draft(等价于列表的"恢复"按钮)
+  //     - 编辑现有 published: 按钮在 UI 上被禁用,这里兜底强制 published
+  let nextStatus
+  if (publish) {
+    nextStatus = 'published'
+  } else if (!isEdit.value) {
+    nextStatus = 'draft'
+  } else if (form.value.status === 'published') {
+    nextStatus = 'published'
+  } else {
+    // draft 或 archived → 都恢复到 draft
+    nextStatus = 'draft'
+  }
+
+  saving.value = true
+  const payload = {
+    title: form.value.title.trim(),
+    description: form.value.description.trim(),
+    role: form.value.role.trim(),
+    goal: form.value.goal.trim(),
+    input: form.value.input,
+    output: form.value.output.trim(),
+    example: form.value.example.trim(),
+    variable_hints: hintsPayload,
+    tag_ids: [...form.value.tag_ids],
+    status: nextStatus,
+  }
 
   try {
     if (isEdit.value) {
@@ -157,11 +179,24 @@ async function handleSave(publish = false) {
     }
     router.push({ name: 'admin-templates' })
   } catch (e) {
-    message.error('保存失败')
+    message.error(e?.message || '保存失败')
   } finally {
     saving.value = false
   }
 }
+
+/**
+ * 「保存草稿」按钮可用性。
+ * - 新建模板: 总是可用（自然落 draft）
+ * - 编辑已有模板:
+ *   - draft: 可用（保持 draft）
+ *   - archived: 可用（保存即恢复到 draft，与列表"恢复"按钮语义一致）
+ *   - published: 不可用（避免误降级到 draft，如要改内容请用「保存并发布」或先去列表下线）
+ */
+const canSaveAsDraft = computed(() => {
+  if (!isEdit.value) return true
+  return form.value.status !== 'published'
+})
 
 onMounted(() => {
   fetchTags()
@@ -170,12 +205,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page">
-    <div class="content">
-      <a-page-header
-        :title="isEdit ? '编辑模板' : '新建模板'"
-        @back="router.push({ name: 'admin-templates' })"
-      />
+  <div class="page-bg">
+    <div class="page-content">
+      <!-- 顶部:图标+返回+标题 -->
+      <header class="page-bar page-bar--editor">
+        <div class="page-bar__left-group">
+          <FileText :size="20" class="page-bar__icon" />
+          <button
+            type="button"
+            class="icon-text-btn"
+            @click="router.push({ name: 'admin-templates' })"
+          >
+            <ChevronLeft :size="16" />
+            <span>返回</span>
+          </button>
+          <h1 class="page-bar__title">{{ isEdit ? '编辑模板' : '新建模板' }}</h1>
+        </div>
+      </header>
 
       <a-spin :spinning="loading">
         <div class="editor-layout">
@@ -186,8 +232,14 @@ onMounted(() => {
               <a-form-item label="标题" required>
                 <a-input v-model:value="form.title" placeholder="如：小红书种草笔记模板" />
               </a-form-item>
-              <a-form-item label="一句话描述" required>
-                <a-input v-model:value="form.description" placeholder="100 字以内描述模板用途" :maxlength="100" show-count />
+              <a-form-item label="描述" required>
+                <a-textarea
+                  v-model:value="form.description"
+                  :rows="2"
+                  :maxlength="500"
+                  show-count
+                  placeholder="简要描述模板用途，便于用户在模板库中检索"
+                />
               </a-form-item>
             </a-form>
           </section>
@@ -260,14 +312,19 @@ onMounted(() => {
           <!-- 状态 + 提交 -->
           <section class="section actions">
             <a-space>
-              <a-button
-                type="primary"
-                :loading="saving"
-                @click="handleSave(false)"
+              <a-tooltip
+                :title="canSaveAsDraft ? '' : '已发布的模板不能再降级为草稿,如需修改请用「保存并发布」或先去列表下线为「已归档」'"
               >
-                <template #icon><Save :size="16" /></template>
-                保存草稿
-              </a-button>
+                <a-button
+                  type="primary"
+                  :loading="saving"
+                  :disabled="!canSaveAsDraft"
+                  @click="handleSave(false)"
+                >
+                  <template #icon><Save :size="16" /></template>
+                  保存草稿
+                </a-button>
+              </a-tooltip>
               <a-button
                 type="primary"
                 ghost
@@ -286,19 +343,37 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page {
-  min-height: 100vh;
-  background: var(--gray-10);
+/* 页面骨架 - 已迁移到全局 .page-bg / .page-content / .page-bar */
+.page-content {
+  padding: 24px 0;
 }
 
-.content {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 0 32px 64px;
+.page-bar__title {
+  font-size: 20px;
+}
+
+.page-bar--editor {
+  padding: 0 24px;
+}
+
+.page-bar--editor .page-bar__title {
+  margin-bottom: 0;
+}
+
+.page-bar__left-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.page-bar__icon {
+  color: var(--main-color);
+  flex-shrink: 0;
 }
 
 .editor-layout {
-  margin-top: 8px;
+  margin: 8px auto 0;
+  max-width: 960px;
 }
 
 .section {

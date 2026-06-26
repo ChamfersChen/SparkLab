@@ -1,10 +1,10 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { Plus, Edit2, Check, StopCircle, Eye, Search } from 'lucide-vue-next'
+import { Plus, Edit2, Check, StopCircle, Eye, Search, Trash2 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
-import { adminListTemplates, adminChangeStatus, adminDeleteTemplate } from '@/apis/template_api'
+import { adminListTemplates, adminChangeStatus, adminHardDeleteTemplate } from '@/apis/template_api'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -12,6 +12,8 @@ const userStore = useUserStore()
 if (!userStore.isAdmin) {
   router.replace({ name: 'dashboard' })
 }
+
+const isSuperAdmin = computed(() => userStore.isSuperAdmin)
 
 const loading = ref(false)
 const items = ref([])
@@ -55,49 +57,89 @@ async function changeStatus(id, status) {
   try {
     await adminChangeStatus(id, status)
     message.success(`模板已${status === 'published' ? '发布' : status === 'archived' ? '下线' : '设为草稿'}`)
-    fetchData()
+    // 当前页被清空时回退一页，避免空列表
+    if (items.value.length === 1 && page.value > 1) {
+      page.value -= 1
+    }
+    await fetchData()
   } catch (e) {
     message.error('操作失败')
   }
 }
 
-async function handleDelete(id) {
+/**
+ * 物理删除模板（仅超管）。
+ * 二次确认：用户必须输入模板标题才能点确认。
+ */
+function handleHardDelete(record) {
+  let typedTitle = ''
   Modal.confirm({
-    title: '确定下线此模板？',
-    content: '下线后用户端将不再显示该模板，但数据保留。',
-    okText: '确认下线',
+    title: `删除模板「${record.title}」?`,
+    content: () =>
+      h('div', null, [
+        h(
+          'p',
+          { style: 'margin-bottom: 8px; color: var(--gray-700);' },
+          '此操作将从数据库中彻底删除该模板及其标签关联，不可恢复。普通用户端将立即无法访问。',
+        ),
+        h('p', { style: 'margin-bottom: 4px;' }, '请输入模板标题以确认：'),
+        h('input', {
+          value: '',
+          placeholder: record.title,
+          style:
+            'width: 100%; padding: 4px 8px; border: 1px solid var(--gray-200); border-radius: 4px;',
+          onInput: (e) => {
+            typedTitle = e.target.value
+          },
+        }),
+      ]),
+    okText: '确认删除',
+    cancelText: '取消',
     okType: 'danger',
     async onOk() {
-      try {
-        await adminDeleteTemplate(id)
-        message.success('模板已下线')
-        fetchData()
-      } catch {
-        message.error('操作失败')
+      if (typedTitle.trim() !== record.title) {
+        message.error('输入的标题不匹配,已取消删除')
+        return Promise.reject(new Error('title mismatch'))
       }
-    }
+      try {
+        await adminHardDeleteTemplate(record.id)
+        message.success('模板已删除')
+        if (items.value.length === 1 && page.value > 1) {
+          page.value -= 1
+        }
+        await fetchData()
+      } catch (e) {
+        message.error(e?.message || '删除失败')
+        return Promise.reject(e)
+      }
+    },
   })
 }
 
 const STATUS_MAP = {
-  draft: { text: '草稿', color: 'default' },
-  published: { text: '已发布', color: 'green' },
-  archived: { text: '已下线', color: 'red' }
+  draft: { text: '草稿', cls: 'status-tag--draft' },
+  published: { text: '已发布', cls: 'status-tag--published' },
+  archived: { text: '已归档', cls: 'status-tag--archived' },
 }
 
 onMounted(fetchData)
 </script>
 
 <template>
-  <div class="page">
-    <div class="content">
-      <div class="page-header">
-        <h1 class="page-title">模板管理</h1>
-        <a-button type="primary" @click="goCreate">
-          <template #icon><Plus :size="16" /></template>
-          新建模板
-        </a-button>
-      </div>
+  <div class="page-bg">
+    <div class="page-content">
+      <!-- 顶部:主标题 + 操作区(无返回) -->
+      <header class="page-bar">
+        <div class="page-bar__title-area">
+          <h1 class="page-bar__title">模板管理</h1>
+        </div>
+        <div class="page-bar__actions">
+          <a-button type="primary" @click="goCreate">
+            <template #icon><Plus :size="16" /></template>
+            新建模板
+          </a-button>
+        </div>
+      </header>
 
       <div class="toolbar">
         <a-input-search
@@ -128,7 +170,7 @@ onMounted(fetchData)
           { title: '状态', key: 'status', width: 100 },
           { title: '使用次数', dataIndex: 'use_count', key: 'use_count', width: 90, align: 'center' },
           { title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 170 },
-          { title: '操作', key: 'action', width: 240 }
+          { title: '操作', key: 'action', width: 320 }
         ]"
         :pagination="false"
         :loading="loading"
@@ -141,9 +183,12 @@ onMounted(fetchData)
             <span v-if="record.tags?.length > 2">…</span>
           </template>
           <template v-if="column.key === 'status'">
-            <a-tag :color="STATUS_MAP[record.status]?.color || 'default'">
+            <span
+              class="status-tag"
+              :class="STATUS_MAP[record.status]?.cls"
+            >
               {{ STATUS_MAP[record.status]?.text || record.status }}
-            </a-tag>
+            </span>
           </template>
           <template v-if="column.key === 'action'">
             <a-space>
@@ -168,7 +213,6 @@ onMounted(fetchData)
                 danger
                 @click="changeStatus(record.id, 'archived')"
               >
-                <template #icon><StopCircle :size="14" /></template>
                 下线
               </a-button>
               <a-button
@@ -178,13 +222,21 @@ onMounted(fetchData)
               >
                 恢复
               </a-button>
-              <a-button
-                size="small"
-                danger
-                @click="handleDelete(record.id)"
+              <a-tooltip
+                v-if="isSuperAdmin"
+                :title="record.status === 'published'
+                  ? '已发布的模板不能删除,请先下线为「已归档」'
+                  : '物理删除：从数据库移除记录，不可恢复'"
               >
-                下线
-              </a-button>
+                <a-button
+                  size="small"
+                  danger
+                  :disabled="record.status === 'published'"
+                  @click="handleHardDelete(record)"
+                >
+                  删除
+                </a-button>
+              </a-tooltip>
             </a-space>
           </template>
         </template>
@@ -193,8 +245,9 @@ onMounted(fetchData)
       <div v-if="total > pageSize" class="pagination-wrap">
         <a-pagination
           v-model:current="page"
+          v-model:page-size="pageSize"
           :total="total"
-          :page-size="pageSize"
+          show-size-changer
           @change="fetchData"
         />
       </div>
@@ -203,29 +256,9 @@ onMounted(fetchData)
 </template>
 
 <style scoped>
-.page {
-  min-height: 100vh;
-  background: var(--gray-10);
-}
-
-.content {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 32px 32px 64px;
-}
-
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 24px;
-}
-
-.page-title {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0;
+/* 页面顶部 - 已迁移到全局 .page-bar / .page-bar__title / .page-bar__actions */
+.page-bar__title {
+  font-size: 20px;
 }
 
 .toolbar {

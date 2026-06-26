@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { Filter, Clock, X } from 'lucide-vue-next'
@@ -23,9 +23,6 @@ const showFilter = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 
-/** 搜索 debounce 句柄 */
-let searchTimer = null
-
 /** 把筛选条件写回 URL query（可分享/可后退） */
 function syncQueryToUrl() {
   const query = {}
@@ -36,7 +33,7 @@ function syncQueryToUrl() {
   router.replace({ query })
 }
 
-/** 从 URL query 恢复筛选条件（首次进入） */
+/** 从 URL query 恢复筛选条件 */
 function loadQueryFromUrl() {
   const q = route.query
   if (typeof q.q === 'string') search.value = q.q
@@ -81,22 +78,13 @@ async function fetchData() {
   }
 }
 
-/** 搜索输入：300ms debounce 后自动查询 */
-function onSearchInput() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    page.value = 1
-    fetchData()
-    syncQueryToUrl()
-  }, 300)
+/** 跳转到模板详情 */
+function goDetail(id) {
+  router.push({ name: 'template-detail', params: { id } })
 }
 
-/** 用户回车立即查询 */
-function onSearchEnter() {
-  if (searchTimer) {
-    clearTimeout(searchTimer)
-    searchTimer = null
-  }
+/** 用户回车或点击搜索按钮 → 立即查询（a-input-search 自带 input 防抖，不需要我们再加） */
+function onSearchSubmit() {
   page.value = 1
   fetchData()
   syncQueryToUrl()
@@ -131,6 +119,14 @@ function clearAllFilters() {
   syncQueryToUrl()
 }
 
+/** 排序变更：仅重置 page 并刷新，不再误用 onPageChange(1) */
+function onSortChange() {
+  page.value = 1
+  fetchData()
+  syncQueryToUrl()
+}
+
+/** 分页变更（页码 / 每页条数） */
 function onPageChange(p, ps) {
   page.value = p
   if (ps && ps !== pageSize.value) pageSize.value = ps
@@ -157,17 +153,30 @@ const allSelectedTags = computed(() => {
   return result
 })
 
+/** 浏览器后退/前进：把 query 状态重新写回本地 ref 并刷新 */
 watch(
   () => route.query,
   (q) => {
-    // 处理浏览器后退/前进
-    if (q.page) return // 由分页组件处理
+    const incomingQ = typeof q.q === 'string' ? q.q : ''
+    const incomingSort = typeof q.sort === 'string' && ['use_count', 'newest'].includes(q.sort) ? q.sort : 'use_count'
+    const incomingTags = typeof q.tags === 'string' && q.tags.trim()
+      ? q.tags.split(',').map((s) => Number(s)).filter((n) => Number.isInteger(n) && n > 0)
+      : []
+    const incomingPage = typeof q.page === 'string' ? Number(q.page) : 1
+    const sameState =
+      search.value === incomingQ &&
+      sortBy.value === incomingSort &&
+      selectedTagIds.value.length === incomingTags.length &&
+      selectedTagIds.value.every((v, i) => v === incomingTags[i]) &&
+      page.value === incomingPage
+    if (sameState) return
+    search.value = incomingQ
+    sortBy.value = incomingSort
+    selectedTagIds.value = incomingTags
+    page.value = Number.isInteger(incomingPage) && incomingPage > 0 ? incomingPage : 1
+    fetchData()
   }
 )
-
-onBeforeUnmount(() => {
-  if (searchTimer) clearTimeout(searchTimer)
-})
 
 onMounted(() => {
   loadQueryFromUrl()
@@ -177,12 +186,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="page">
-    <div class="content">
-      <div class="page-header">
-        <h1 class="page-title">模板库</h1>
-        <p class="page-desc">浏览可用的提示词模板，找到适合你的开始使用</p>
-      </div>
+  <div class="page-bg">
+    <div class="page-content">
+      <!-- 顶部:主标题 + 副标题(无返回按钮,无操作区) -->
+      <header class="page-bar">
+        <div class="page-bar__title-area">
+          <h2 class="page-bar__title">模板库</h2>
+          <p class="page-bar__sub">浏览可用的提示词模板,找到适合你的开始使用</p>
+        </div>
+      </header>
 
       <!-- 搜索 + 排序 -->
       <div class="toolbar">
@@ -191,10 +203,9 @@ onMounted(() => {
           placeholder="搜索模板名称或描述…"
           allow-clear
           class="search-input"
-          @search="onSearchEnter"
-          @input="onSearchInput"
+          @search="onSearchSubmit"
         />
-        <a-select v-model:value="sortBy" style="width: 140px" @change="onPageChange(1)">
+        <a-select v-model:value="sortBy" style="width: 140px" @change="onSortChange">
           <a-select-option value="use_count">按使用次数</a-select-option>
           <a-select-option value="newest">按最新发布</a-select-option>
         </a-select>
@@ -254,7 +265,7 @@ onMounted(() => {
           >
             <div class="card-header">
               <h3 class="card-title">{{ item.title }}</h3>
-              <a-tag v-if="item.status === 'published'" color="green" class="status-tag">已发布</a-tag>
+              <span v-if="item.status === 'published'" class="status-tag status-tag--published">已发布</span>
             </div>
             <p class="card-desc">{{ item.description }}</p>
             <div class="card-tags">
@@ -281,9 +292,9 @@ onMounted(() => {
       <!-- 分页 -->
       <div v-if="total > pageSize" class="pagination-wrap">
         <a-pagination
-          :current="page"
+          v-model:current="page"
+          v-model:page-size="pageSize"
           :total="total"
-          :page-size="pageSize"
           show-size-changer
           show-total="total => `共 ${total} 条`"
           @change="onPageChange"
@@ -294,32 +305,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.page {
-  min-height: 100vh;
-  background: var(--gray-10);
-}
-
-.content {
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 32px 24px;
-}
-
-.page-header {
-  margin-bottom: 24px;
-}
-
-.page-title {
-  font-size: 28px;
-  font-weight: 600;
-  color: var(--gray-900);
-  margin: 0 0 4px;
-}
-
-.page-desc {
-  font-size: 14px;
-  color: var(--gray-600);
-  margin: 0;
+/* 页面顶部 - 已迁移到全局 .page-bar / .page-bar__title / .page-bar__sub */
+.page-bar__title {
+  font-size: 20px;
 }
 
 .toolbar {

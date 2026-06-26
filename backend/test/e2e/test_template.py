@@ -3,7 +3,6 @@ import time
 
 import pytest
 from httpx import AsyncClient
-
 from sparklab.config import get_settings
 
 
@@ -188,3 +187,109 @@ async def test_user_cannot_access_admin_templates(client: AsyncClient) -> None:
     # Try accessing admin templates
     resp = await client.get("/api/admin/templates", headers=user_headers)
     assert resp.status_code == 403
+
+
+async def _admin_headers(client: AsyncClient) -> dict[str, str]:
+    """登录超管并返回 Bearer 头。"""
+    settings = get_settings()
+    resp = await client.post(
+        "/api/auth/login",
+        json={
+            "username": settings.initial_superadmin_username,
+            "password": settings.initial_superadmin_password,
+        },
+    )
+    assert resp.status_code == 200
+    return {"Authorization": f"Bearer {resp.json()['token']}"}
+
+
+@pytest.mark.asyncio
+async def test_create_template_rejects_invalid_status(client: AsyncClient) -> None:
+    """创建模板时 status 非法值应被 422 拒绝。"""
+    headers = await _admin_headers(client)
+    resp = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "x",
+            "description": "x",
+            "role": "x",
+            "goal": "x",
+            "input": "x",
+            "output": "x",
+            "example": "x",
+            "status": "deleted",  # 非法值
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_change_status_rejects_invalid_value(client: AsyncClient) -> None:
+    """状态切换接口 status 非法值应被 422 拒绝。"""
+    headers = await _admin_headers(client)
+    # 准备一个模板
+    create = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "t-status",
+            "description": "t",
+            "role": "r",
+            "goal": "g",
+            "input": "i",
+            "output": "o",
+            "example": "e",
+        },
+        headers=headers,
+    )
+    assert create.status_code == 201
+    tid = create.json()["id"]
+
+    resp = await client.put(
+        f"/api/admin/templates/{tid}/status",
+        json={"status": "removed"},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_template_rejects_invalid_tag_ids(client: AsyncClient) -> None:
+    """创建模板时 tag_ids 含不存在的 ID 应被 400 拒绝。"""
+    headers = await _admin_headers(client)
+    resp = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "t-bad-tag",
+            "description": "t",
+            "role": "r",
+            "goal": "g",
+            "input": "i",
+            "output": "o",
+            "example": "e",
+            "tag_ids": [999_999],
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 400
+    assert "999999" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_template_rejects_empty_title(client: AsyncClient) -> None:
+    """空 title 应被 422 拒绝。"""
+    headers = await _admin_headers(client)
+    resp = await client.post(
+        "/api/admin/templates",
+        json={
+            "title": "",
+            "description": "t",
+            "role": "r",
+            "goal": "g",
+            "input": "i",
+            "output": "o",
+            "example": "e",
+        },
+        headers=headers,
+    )
+    assert resp.status_code == 422

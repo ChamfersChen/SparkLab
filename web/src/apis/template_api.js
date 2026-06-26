@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPut, apiDelete, apiAdminGet, apiAdminPost, apiAdminPut, apiAdminDelete } from './base'
+import { apiGet, apiPost, apiAdminGet, apiAdminPost, apiAdminPut, apiAdminDelete } from './base'
 
 /**
  * 用户端模板 API
@@ -21,27 +21,29 @@ export function incrementUseCount(id) {
 
 /**
  * 管理后台模板 API
+ *
+ * 注意：apiAdmin* 系列不会自动加 /admin 前缀，需在 path 中显式写出。
  */
 export function adminListTemplates(params = {}) {
-  return apiAdminGet('/templates', params)
+  return apiAdminGet('/admin/templates', params)
 }
 
 export function adminGetTemplate(id) {
-  return apiAdminGet(`/templates/${id}`)
+  return apiAdminGet(`/admin/templates/${id}`)
 }
 
 export function adminCreateTemplate(data) {
-  return apiAdminPost('/templates', data)
+  return apiAdminPost('/admin/templates', data)
 }
 
 export function adminUpdateTemplate(id, data) {
-  return apiAdminPut(`/templates/${id}`, data)
+  return apiAdminPut(`/admin/templates/${id}`, data)
 }
 
 export function adminChangeStatus(id, status) {
-  return apiAdminPut(`/templates/${id}/status`, { status })
+  return apiAdminPut(`/admin/templates/${id}/status`, { status })
 }
 
 export function adminDeleteTemplate(id) {
-  return apiAdminDelete(`/templates/${id}`)
+  return apiAdminDelete(`/admin/templates/${id}`)
 }

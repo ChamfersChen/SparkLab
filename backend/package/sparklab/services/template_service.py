@@ -4,8 +4,10 @@ import json
 import re
 
 from fastapi import HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from sparklab.models.tag import Tag
 from sparklab.models.template import Template
 from sparklab.repositories.template_repository import TemplateRepository
 
@@ -19,6 +21,20 @@ class TemplateService:
     def _extract_variables(input_text: str) -> list[str]:
         """从 Input 段中提取所有 {{变量名}}。"""
         return list(dict.fromkeys(re.findall(r"\{\{(.*?)\}\}", input_text)))
+
+    async def _validate_tag_ids(self, tag_ids: list[int] | None) -> None:
+        """校验 tag_ids 全部存在；空/None 直接通过。"""
+        if not tag_ids:
+            return
+        unique_ids = list(dict.fromkeys(tag_ids))
+        result = await self.db.execute(select(Tag.id).where(Tag.id.in_(unique_ids)))
+        existing = {row[0] for row in result.all()}
+        missing = [tid for tid in unique_ids if tid not in existing]
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"以下标签不存在：{', '.join(map(str, missing))}",
+            )
 
     async def list_templates(
         self,
@@ -62,6 +78,7 @@ class TemplateService:
         tag_ids: list[int] | None = None,
         status: str = "draft",
     ):
+        await self._validate_tag_ids(tag_ids)
         template = await self.repo.create(
             title=title,
             description=description,
@@ -83,6 +100,9 @@ class TemplateService:
         template_id: int,
         **kwargs,
     ):
+        tag_ids = kwargs.get("tag_ids")
+        if tag_ids is not None:
+            await self._validate_tag_ids(tag_ids)
         template = await self.repo.update(template_id, **kwargs)
         if not template:
             raise HTTPException(

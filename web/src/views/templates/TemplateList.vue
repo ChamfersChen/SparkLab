@@ -1,14 +1,13 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, computed, watch, onBeforeUnmount } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { Search, Filter, ArrowUpDown, Star, Clock, LayoutGrid } from 'lucide-vue-next'
-import { useUserStore } from '@/stores/user'
+import { Filter, Clock, X } from 'lucide-vue-next'
 import { listTemplates } from '@/apis/template_api'
 import { getTagsGrouped } from '@/apis/tag_api'
 
 const router = useRouter()
-const userStore = useUserStore()
+const route = useRoute()
 
 const loading = ref(false)
 const items = ref([])
@@ -24,13 +23,45 @@ const showFilter = ref(false)
 const page = ref(1)
 const pageSize = ref(20)
 
+/** 搜索 debounce 句柄 */
+let searchTimer = null
+
+/** 把筛选条件写回 URL query（可分享/可后退） */
+function syncQueryToUrl() {
+  const query = {}
+  if (search.value.trim()) query.q = search.value.trim()
+  if (sortBy.value !== 'use_count') query.sort = sortBy.value
+  if (selectedTagIds.value.length) query.tags = selectedTagIds.value.join(',')
+  if (page.value !== 1) query.page = page.value
+  router.replace({ query })
+}
+
+/** 从 URL query 恢复筛选条件（首次进入） */
+function loadQueryFromUrl() {
+  const q = route.query
+  if (typeof q.q === 'string') search.value = q.q
+  if (typeof q.sort === 'string' && ['use_count', 'newest'].includes(q.sort)) {
+    sortBy.value = q.sort
+  }
+  if (typeof q.tags === 'string' && q.tags.trim()) {
+    selectedTagIds.value = q.tags
+      .split(',')
+      .map((s) => Number(s))
+      .filter((n) => Number.isInteger(n) && n > 0)
+  }
+  if (typeof q.page === 'string') {
+    const p = Number(q.page)
+    if (Number.isInteger(p) && p > 0) page.value = p
+  }
+}
+
 async function fetchData() {
   loading.value = true
   try {
     const params = {
       page: page.value,
       page_size: pageSize.value,
-      sort_by: sortBy.value
+      sort_by: sortBy.value,
     }
     if (search.value.trim()) {
       params.search = search.value.trim()
@@ -50,10 +81,30 @@ async function fetchData() {
   }
 }
 
+/** 搜索输入：300ms debounce 后自动查询 */
+function onSearchInput() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    page.value = 1
+    fetchData()
+    syncQueryToUrl()
+  }, 300)
+}
+
+/** 用户回车立即查询 */
+function onSearchEnter() {
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
+  page.value = 1
+  fetchData()
+  syncQueryToUrl()
+}
+
 async function fetchTags() {
   try {
-    const res = await getTagsGrouped()
-    tags.value = res
+    tags.value = await getTagsGrouped()
   } catch {
     // 标签加载失败不阻塞
   }
@@ -68,11 +119,31 @@ function toggleTag(tagId) {
   }
   page.value = 1
   fetchData()
+  syncQueryToUrl()
 }
 
-function goDetail(id) {
-  router.push({ name: 'template-detail', params: { id } })
+function clearAllFilters() {
+  search.value = ''
+  selectedTagIds.value = []
+  sortBy.value = 'use_count'
+  page.value = 1
+  fetchData()
+  syncQueryToUrl()
 }
+
+function onPageChange(p, ps) {
+  page.value = p
+  if (ps && ps !== pageSize.value) pageSize.value = ps
+  fetchData()
+  syncQueryToUrl()
+}
+
+const hasActiveFilter = computed(
+  () =>
+    search.value.trim().length > 0 ||
+    selectedTagIds.value.length > 0 ||
+    sortBy.value !== 'use_count'
+)
 
 const allSelectedTags = computed(() => {
   const result = []
@@ -86,7 +157,20 @@ const allSelectedTags = computed(() => {
   return result
 })
 
+watch(
+  () => route.query,
+  (q) => {
+    // 处理浏览器后退/前进
+    if (q.page) return // 由分页组件处理
+  }
+)
+
+onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+})
+
 onMounted(() => {
+  loadQueryFromUrl()
   fetchTags()
   fetchData()
 })
@@ -107,15 +191,25 @@ onMounted(() => {
           placeholder="搜索模板名称或描述…"
           allow-clear
           class="search-input"
-          @search="fetchData"
+          @search="onSearchEnter"
+          @input="onSearchInput"
         />
-        <a-select v-model:value="sortBy" style="width: 140px" @change="fetchData">
+        <a-select v-model:value="sortBy" style="width: 140px" @change="onPageChange(1)">
           <a-select-option value="use_count">按使用次数</a-select-option>
           <a-select-option value="newest">按最新发布</a-select-option>
         </a-select>
         <a-button :type="showFilter ? 'primary' : 'default'" @click="showFilter = !showFilter">
           <template #icon><Filter :size="16" /></template>
           筛选
+        </a-button>
+        <a-button
+          v-if="hasActiveFilter"
+          type="text"
+          class="clear-btn"
+          @click="clearAllFilters"
+        >
+          <template #icon><X :size="14" /></template>
+          清除全部
         </a-button>
       </div>
 
@@ -141,6 +235,12 @@ onMounted(() => {
         <a-tag v-for="t in allSelectedTags" :key="t.id" closable color="blue" @close="toggleTag(t.id)">
           {{ t.name }}
         </a-tag>
+      </div>
+
+      <!-- 结果数 -->
+      <div v-if="!loading" class="result-summary">
+        共 <strong>{{ total }}</strong> 个模板
+        <span v-if="hasActiveFilter" class="filter-hint">（已应用筛选）</span>
       </div>
 
       <!-- 模板列表 -->
@@ -170,18 +270,23 @@ onMounted(() => {
           </div>
         </div>
 
-        <a-empty v-else-if="!loading" description="没有找到匹配的模板，换个关键词试试" />
+        <a-empty
+          v-else-if="!loading"
+          :description="hasActiveFilter ? '没有找到匹配的模板，试试调整筛选条件' : '暂无可用模板'"
+        >
+          <a-button v-if="hasActiveFilter" type="primary" @click="clearAllFilters">清除筛选</a-button>
+        </a-empty>
       </a-spin>
 
       <!-- 分页 -->
       <div v-if="total > pageSize" class="pagination-wrap">
         <a-pagination
-          v-model:current="page"
+          :current="page"
           :total="total"
           :page-size="pageSize"
           show-size-changer
           show-total="total => `共 ${total} 条`"
-          @change="fetchData"
+          @change="onPageChange"
         />
       </div>
     </div>
@@ -197,7 +302,7 @@ onMounted(() => {
 .content {
   max-width: 1080px;
   margin: 0 auto;
-  padding: 32px 32px 64px;
+  padding: 32px 24px;
 }
 
 .page-header {
@@ -205,19 +310,18 @@ onMounted(() => {
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0 0 6px;
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0 0 4px;
 }
 
 .page-desc {
   font-size: 14px;
-  color: var(--color-text-secondary);
+  color: var(--gray-600);
   margin: 0;
 }
 
-/* Toolbar */
 .toolbar {
   display: flex;
   gap: 12px;
@@ -226,83 +330,106 @@ onMounted(() => {
 }
 
 .search-input {
-  max-width: 360px;
   flex: 1;
+  max-width: 480px;
 }
 
-/* Filter panel */
+.clear-btn {
+  color: var(--gray-600);
+}
+
 .filter-panel {
   background: var(--gray-0);
-  border: 1px solid var(--gray-50);
+  border: 1px solid var(--gray-150);
   border-radius: 8px;
   padding: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .filter-group {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--gray-100);
+}
+
+.filter-group:last-child {
+  border-bottom: none;
 }
 
 .filter-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  min-width: 60px;
-  line-height: 24px;
+  flex-shrink: 0;
+  width: 80px;
+  font-size: 13px;
+  color: var(--gray-700);
+  font-weight: 500;
+  padding-top: 4px;
 }
 
 .selected-tags {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 16px;
   flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
 .selected-label {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
+  font-size: 13px;
+  color: var(--gray-600);
+  margin-right: 4px;
 }
 
-/* Card grid */
+.result-summary {
+  font-size: 13px;
+  color: var(--gray-600);
+  margin: 4px 0 16px;
+}
+
+.result-summary strong {
+  color: var(--gray-900);
+  font-weight: 600;
+}
+
+.filter-hint {
+  color: var(--main-500);
+  margin-left: 4px;
+}
+
 .template-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
 }
 
 .template-card {
   background: var(--gray-0);
-  border: 1px solid var(--gray-50);
-  border-radius: 10px;
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
   padding: 20px;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: background-color 0.15s ease;
 }
 
 .template-card:hover {
-  border-color: var(--main-30);
-  box-shadow: var(--shadow-sm);
+  background: var(--gray-25);
 }
 
 .card-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 8px;
 }
 
 .card-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--gray-900);
   margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.4;
   flex: 1;
 }
 
@@ -312,7 +439,7 @@ onMounted(() => {
 
 .card-desc {
   font-size: 13px;
-  color: var(--color-text-secondary);
+  color: var(--gray-600);
   line-height: 1.5;
   margin: 0 0 12px;
   display: -webkit-box;
@@ -323,27 +450,28 @@ onMounted(() => {
 
 .card-tags {
   display: flex;
-  gap: 4px;
   flex-wrap: wrap;
-  margin-bottom: 8px;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  min-height: 22px;
 }
 
 .tag-item {
-  font-size: 11px;
+  margin: 0;
 }
 
 .tag-more {
-  font-size: 11px;
-  color: var(--color-text-tertiary);
-  line-height: 22px;
+  font-size: 12px;
+  color: var(--gray-500);
 }
 
 .card-meta {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   font-size: 12px;
-  color: var(--color-text-tertiary);
+  color: var(--gray-500);
 }
 
 .meta-item {
@@ -354,18 +482,7 @@ onMounted(() => {
 
 .pagination-wrap {
   margin-top: 24px;
-  text-align: center;
-}
-
-@media (max-width: 640px) {
-  .content {
-    padding: 24px 16px 48px;
-  }
-  .toolbar {
-    flex-wrap: wrap;
-  }
-  .search-input {
-    max-width: 100%;
-  }
+  display: flex;
+  justify-content: center;
 }
 </style>

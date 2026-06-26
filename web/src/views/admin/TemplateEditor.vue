@@ -92,8 +92,7 @@ function isTagSelected(tagId) {
 
 async function fetchTags() {
   try {
-    const res = await listTags()
-    tags.value = res
+    tags.value = await getTagsGrouped()
   } catch {
     // 不阻塞
   }

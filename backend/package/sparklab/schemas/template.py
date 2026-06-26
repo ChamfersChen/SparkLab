@@ -1,6 +1,9 @@
 from datetime import datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+TemplateStatusLiteral = Literal["draft", "published", "archived"]
 
 
 class TagInfo(BaseModel):
@@ -61,33 +64,33 @@ class TemplateListResponse(BaseModel):
 
 
 class TemplateCreateRequest(BaseModel):
-    title: str
-    description: str
-    role: str
-    goal: str
-    input: str
-    output: str
-    example: str
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(..., min_length=1, max_length=500)
+    role: str = Field(..., min_length=1)
+    goal: str = Field(..., min_length=1)
+    input: str = Field(..., min_length=1)
+    output: str = Field(..., min_length=1)
+    example: str = Field(..., min_length=1)
     variable_hints: dict[str, str] | None = None
     tag_ids: list[int] = []
-    status: str = "draft"
+    status: TemplateStatusLiteral = "draft"
 
 
 class TemplateUpdateRequest(BaseModel):
-    title: str | None = None
-    description: str | None = None
-    role: str | None = None
-    goal: str | None = None
-    input: str | None = None
-    output: str | None = None
-    example: str | None = None
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, min_length=1, max_length=500)
+    role: str | None = Field(default=None, min_length=1)
+    goal: str | None = Field(default=None, min_length=1)
+    input: str | None = Field(default=None, min_length=1)
+    output: str | None = Field(default=None, min_length=1)
+    example: str | None = Field(default=None, min_length=1)
     variable_hints: dict[str, str] | None = None
     tag_ids: list[int] | None = None
-    status: str | None = None
+    status: TemplateStatusLiteral | None = None
 
 
 class TemplateStatusChangeRequest(BaseModel):
-    status: str
+    status: TemplateStatusLiteral
 
 
 class TemplateListParams(BaseModel):

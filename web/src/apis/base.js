@@ -15,6 +15,30 @@ import { useUserStore, checkAdminPermission, checkSuperAdminPermission } from '@
 const BASE = '/api'
 
 /**
+ * 将后端错误响应解析为用户可读的 message。
+ * 支持三种 detail 形态:
+ *   1. Pydantic 422 校验错误的数组 [{type, loc, msg, input}, ...]
+ *   2. 自定义 HTTPException(detail={...}) 的对象 {message, error}
+ *   3. 最常见的 HTTPException(detail="string") 的字符串
+ */
+function formatErrorMessage(errorData, status, fallback) {
+  if (!errorData) return fallback
+  const detail = errorData.detail
+  if (Array.isArray(detail)) {
+    // Pydantic v2 422 标准结构
+    const parts = detail.map((err) => {
+      const field = Array.isArray(err?.loc) ? err.loc.filter((s) => s !== 'body').join('.') : ''
+      return field ? `${field}: ${err.msg}` : err.msg
+    })
+    return parts.length ? parts.join('；') : fallback
+  }
+  if (detail && typeof detail === 'object') {
+    return detail.message || detail.error || fallback
+  }
+  return detail || errorData.message || fallback
+}
+
+/**
  * 发送 API 请求的基础函数
  * @param {string} path - API 端点（不含 /api 前缀）
  * @param {Object} options - 请求选项
@@ -48,12 +72,7 @@ export async function apiRequest(path, options = {}, requiresAuth = true, respon
 
       try {
         errorData = await response.json()
-        const detail = errorData.detail
-        if (detail && typeof detail === 'object') {
-          errorMessage = detail.message || detail.error || errorMessage
-        } else {
-          errorMessage = detail || errorData.message || errorMessage
-        }
+        errorMessage = formatErrorMessage(errorData, response.status, errorMessage)
       } catch {
         // 非 JSON 响应
       }
@@ -81,7 +100,7 @@ export async function apiRequest(path, options = {}, requiresAuth = true, respon
         }, 1500)
         throw error
       } else if (response.status === 403) {
-        error.message = '没有权限执行此操作'
+        error.message = '权限不足'
         throw error
       } else if (response.status === 500) {
         error.message = '服务器内部错误，请使用 docker logs sparklab-api-dev 查看详细日志'
@@ -95,6 +114,16 @@ export async function apiRequest(path, options = {}, requiresAuth = true, respon
     if (responseType === 'blob') {
       return response
     } else if (responseType === 'json') {
+      // 204 / 304 等无 body 响应,FastAPI 偶尔会带 Content-Type: application/json + 空 body,
+      // response.json() 在空 body 时抛 SyntaxError: Unexpected end of JSON input.
+      // 提前用状态码 + Content-Length 守卫,避免误读空 body。
+      if (response.status === 204 || response.status === 304) {
+        return null
+      }
+      const contentLength = response.headers.get('Content-Length')
+      if (contentLength === '0') {
+        return null
+      }
       const contentType = response.headers.get('Content-Type')
       if (contentType && contentType.includes('application/json')) {
         return await response.json()
@@ -122,7 +151,7 @@ export function apiGet(path, options = {}, requiresAuth = true, responseType = '
 
 export function apiAdminGet(path, options = {}, responseType = 'json') {
   checkAdminPermission()
-  return apiGet(path, options, true, responseType)
+  return apiGet(`/admin${path}`, options, true, responseType)
 }
 
 export function apiSuperAdminGet(path, options = {}, responseType = 'json') {
@@ -148,7 +177,7 @@ export function apiPost(path, data = {}, options = {}, requiresAuth = true, resp
 
 export function apiAdminPost(path, data = {}, options = {}, responseType = 'json') {
   checkAdminPermission()
-  return apiPost(path, data, options, true, responseType)
+  return apiPost(`/admin${path}`, data, options, true, responseType)
 }
 
 export function apiSuperAdminPost(path, data = {}, options = {}, responseType = 'json') {
@@ -174,7 +203,7 @@ export function apiPut(path, data = {}, options = {}, requiresAuth = true, respo
 
 export function apiAdminPut(path, data = {}, options = {}, responseType = 'json') {
   checkAdminPermission()
-  return apiPut(path, data, options, true, responseType)
+  return apiPut(`/admin${path}`, data, options, true, responseType)
 }
 
 export function apiSuperAdminPut(path, data = {}, options = {}, responseType = 'json') {
@@ -191,7 +220,7 @@ export function apiDelete(path, options = {}, requiresAuth = true, responseType 
 
 export function apiAdminDelete(path, options = {}) {
   checkAdminPermission()
-  return apiDelete(path, options, true)
+  return apiDelete(`/admin${path}`, options, true)
 }
 
 export function apiSuperAdminDelete(path, options = {}) {

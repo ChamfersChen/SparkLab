@@ -22,28 +22,33 @@ export function incrementUseCount(id) {
 /**
  * 管理后台模板 API
  *
- * 注意：apiAdmin* 系列不会自动加 /admin 前缀，需在 path 中显式写出。
+ * apiAdmin* 系列已自动拼 /admin 前缀，调用方无需再写。
  */
 export function adminListTemplates(params = {}) {
-  return apiAdminGet('/admin/templates', params)
+  return apiAdminGet('/templates', params)
 }
 
 export function adminGetTemplate(id) {
-  return apiAdminGet(`/admin/templates/${id}`)
+  return apiAdminGet(`/templates/${id}`)
 }
 
 export function adminCreateTemplate(data) {
-  return apiAdminPost('/admin/templates', data)
+  return apiAdminPost('/templates', data)
 }
 
 export function adminUpdateTemplate(id, data) {
-  return apiAdminPut(`/admin/templates/${id}`, data)
+  return apiAdminPut(`/templates/${id}`, data)
 }
 
 export function adminChangeStatus(id, status) {
-  return apiAdminPut(`/admin/templates/${id}/status`, { status })
+  return apiAdminPut(`/templates/${id}/status`, { status })
 }
 
 export function adminDeleteTemplate(id) {
-  return apiAdminDelete(`/admin/templates/${id}`)
+  return apiAdminDelete(`/templates/${id}`)
+}
+
+/** 物理删除模板(仅超管) - 从 DB 移除记录,不可恢复。 */
+export function adminHardDeleteTemplate(id) {
+  return apiAdminDelete(`/templates/${id}/hard`)
 }

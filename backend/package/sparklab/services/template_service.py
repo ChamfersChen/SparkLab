@@ -59,7 +59,7 @@ class TemplateService:
     async def list_templates(
         self,
         search: str | None = None,
-        tag_ids: list[int] | None = None,
+        tag_id_groups: list[list[int]] | None = None,
         status: str | None = None,
         page: int = 1,
         page_size: int = 20,
@@ -67,7 +67,7 @@ class TemplateService:
     ) -> tuple[list, int]:
         return await self.repo.list_all(
             search=search,
-            tag_ids=tag_ids,
+            tag_id_groups=tag_id_groups,
             status=status,
             offset=(page - 1) * page_size,
             limit=page_size,

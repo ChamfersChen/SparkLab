@@ -26,7 +26,7 @@ class TemplateRepository:
         self,
         *,
         search: str | None = None,
-        tag_ids: list[int] | None = None,
+        tag_id_groups: list[list[int]] | None = None,
         status: str | None = None,
         offset: int = 0,
         limit: int = 20,
@@ -50,17 +50,22 @@ class TemplateRepository:
             query = query.where(Template.status == status)
             count_query = count_query.where(Template.status == status)
 
-        # 标签筛选（通过子查询）
-        if tag_ids:
-            subq = (
-                select(TemplateTag.template_id)
-                .where(TemplateTag.tag_id.in_(tag_ids))
-                .group_by(TemplateTag.template_id)
-                .having(func.count(TemplateTag.tag_id) == len(tag_ids))
-                .subquery()
-            )
-            query = query.where(Template.id.in_(select(subq.c.template_id)))
-            count_query = count_query.where(Template.id.in_(select(subq.c.template_id)))
+        # 标签筛选：组间 AND、组内 OR
+        # 每个组生成一个 EXISTS 子查询(模板至少匹配组内一个 tag),多组用 AND 拼接。
+        if tag_id_groups:
+            for group in tag_id_groups:
+                if not group:
+                    continue
+                exists_clause = (
+                    select(TemplateTag.template_id)
+                    .where(
+                        TemplateTag.template_id == Template.id,
+                        TemplateTag.tag_id.in_(group),
+                    )
+                    .exists()
+                )
+                query = query.where(exists_clause)
+                count_query = count_query.where(exists_clause)
 
         # 排序
         if sort_by == "newest":

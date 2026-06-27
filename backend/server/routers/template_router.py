@@ -28,10 +28,32 @@ async def _get_service(db: AsyncSession = Depends(get_db)) -> TemplateService:
     return TemplateService(db)
 
 
+def _parse_tag_id_groups(raw: str | None) -> list[list[int]] | None:
+    """解析 tag_ids 串。
+
+    形式: "1,2;3,4" → [[1,2],[3,4]] (组间 AND,组内 OR)。
+    单组退化: "1,2" → [[1,2]] (语义等价于"或");
+    单值退化: "1" → [[1]];
+    空/None → None。
+    非法/非数字字符静默跳过,避免 422 干扰用户。
+    """
+    if not raw:
+        return None
+    groups: list[list[int]] = []
+    for chunk in raw.split(";"):
+        ids = [int(t) for t in chunk.split(",") if t.strip().isdigit()]
+        if ids:
+            groups.append(ids)
+    return groups or None
+
+
 @template.get("", response_model=TemplateListResponse)
 async def list_templates(
     search: str | None = Query(None, description="搜索标题/描述"),
-    tag_ids: str | None = Query(None, description="逗号分隔的标签 ID"),
+    tag_ids: str | None = Query(
+        None,
+        description="标签筛选: 分号分组,逗号分隔成员。组间 AND、组内 OR,例如 '1,2;3'",
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     sort_by: str = Query("use_count", description="排序：use_count / newest"),
@@ -39,10 +61,9 @@ async def list_templates(
     service: TemplateService = Depends(_get_service),
 ):
     """已发布的模板列表（用户端）。"""
-    parsed_tag_ids = [int(t) for t in tag_ids.split(",") if t.strip().isdigit()] if tag_ids else None
     items, total = await service.list_templates(
         search=search,
-        tag_ids=parsed_tag_ids,
+        tag_id_groups=_parse_tag_id_groups(tag_ids),
         status="published",
         page=page,
         page_size=page_size,

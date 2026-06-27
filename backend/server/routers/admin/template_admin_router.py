@@ -21,6 +21,7 @@ from sparklab.services.template_service import TemplateService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.utils.auth_middleware import get_current_admin, get_current_super_admin, get_db, get_required_user
+from server.routers.template_router import _parse_tag_id_groups
 
 template_admin = APIRouter(
     prefix="/templates",
@@ -36,7 +37,10 @@ async def _get_service(db: AsyncSession = Depends(get_db)) -> TemplateService:
 @template_admin.get("", response_model=TemplateListResponse)
 async def list_templates(
     search: str | None = Query(None, description="搜索标题/描述"),
-    tag_ids: str | None = Query(None, description="逗号分隔的标签 ID"),
+    tag_ids: str | None = Query(
+        None,
+        description="标签筛选: 分号分组,逗号分隔成员。组间 AND、组内 OR,例如 '1,2;3'",
+    ),
     status: str | None = Query(None, description="筛选：draft / published / archived"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -44,10 +48,9 @@ async def list_templates(
     service: TemplateService = Depends(_get_service),
 ):
     """管理员模板列表（包含所有状态）。"""
-    parsed_tag_ids = [int(t) for t in tag_ids.split(",") if t.strip().isdigit()] if tag_ids else None
     items, total = await service.list_templates(
         search=search,
-        tag_ids=parsed_tag_ids,
+        tag_id_groups=_parse_tag_id_groups(tag_ids),
         status=status,
         page=page,
         page_size=page_size,

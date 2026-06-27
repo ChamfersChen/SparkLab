@@ -490,3 +490,97 @@ async def test_draft_template_visible_via_admin_endpoint_to_any_admin(
     resp = await client.get(f"/api/admin/templates/{tid}", headers=admin_headers)
     assert resp.status_code == 200
     assert resp.json()["status"] == "draft"
+
+
+@pytest.mark.asyncio
+async def test_list_templates_tag_filter_and_or_semantics(client: AsyncClient) -> None:
+    """标签筛选: 组间 AND、组内 OR。
+
+    构造 3 个分类共 4 个标签:
+      平台: 微信(P1) / 小红书(P2)
+      内容类型: 营销文案(C1)
+      行业: 美妆(I1)
+
+    构造 4 个已发布模板,标签组合:
+      T_a = {P1, C1}            微信 + 营销
+      T_b = {P2, C1, I1}        小红书 + 营销 + 美妆
+      T_c = {P1}                只有微信
+      T_d = {P2, I1}            小红书 + 美妆(无营销)
+
+    断言:
+      ?tag_ids=P1,P2         → T_a,T_b,T_c,T_d   单组 OR
+      ?tag_ids=P1,P2;C1      → T_a,T_b           (微信 OR 小红书) AND 营销
+      ?tag_ids=P1,P2;C1;I1   → T_b               + AND 美妆
+      ?tag_ids=P1;C1         → T_a               单成员等价于"AND 精确"
+    """
+    headers = await _admin_headers(client)
+    ts = str(int(time.time()))
+
+    async def create_tag(name: str, category: str) -> int:
+        r = await client.post(
+            "/api/admin/tags",
+            json={"name": f"{name}-{ts}", "category": category, "sort_order": 0},
+            headers=headers,
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    p1 = await create_tag("微信", "platform")
+    p2 = await create_tag("小红书", "platform")
+    c1 = await create_tag("营销文案", "content_type")
+    i1 = await create_tag("美妆", "industry")
+
+    async def create_tpl(title: str, tag_ids: list[int]) -> int:
+        r = await client.post(
+            "/api/admin/templates",
+            json={
+                "title": f"{title}-{ts}",
+                "description": "x",
+                "role": "x",
+                "goal": "x",
+                "input": "x",
+                "output": "x",
+                "example": "x",
+                "tag_ids": tag_ids,
+                "status": "published",
+            },
+            headers=headers,
+        )
+        assert r.status_code == 201, r.text
+        return r.json()["id"]
+
+    t_a = await create_tpl("T_a", [p1, c1])
+    t_b = await create_tpl("T_b", [p2, c1, i1])
+    t_c = await create_tpl("T_c", [p1])
+    t_d = await create_tpl("T_d", [p2, i1])
+
+    async def fetch_ids(tag_ids: str) -> set[int]:
+        r = await client.get(
+            f"/api/templates?tag_ids={tag_ids}&page=1&page_size=100",
+            headers=headers,
+        )
+        assert r.status_code == 200, r.text
+        # 用 e2e 共享 DB,可能还有其他遗留模板;只断言我们刚建的 4 个的命中关系
+        ours = {t_a, t_b, t_c, t_d}
+        return {i["id"] for i in r.json()["items"] if i["id"] in ours}
+
+    # 组内 OR: 平台 ∈ {微信, 小红书} → 全部 4 个
+    assert await fetch_ids(f"{p1},{p2}") == {t_a, t_b, t_c, t_d}
+
+    # 组间 AND: (微信 OR 小红书) AND 营销 → T_a, T_b
+    assert await fetch_ids(f"{p1},{p2};{c1}") == {t_a, t_b}
+
+    # 三组 AND: + 美妆 → 只剩 T_b
+    assert await fetch_ids(f"{p1},{p2};{c1};{i1}") == {t_b}
+
+    # 退化为"AND 精确": 微信 AND 营销 → T_a
+    assert await fetch_ids(f"{p1};{c1}") == {t_a}
+
+    # 不传标签时不应受筛选影响 (我们 4 个都应当被列出)
+    r_all = await client.get(
+        "/api/templates?page=1&page_size=100",
+        headers=headers,
+    )
+    assert r_all.status_code == 200
+    all_ids = {i["id"] for i in r_all.json()["items"]}
+    assert {t_a, t_b, t_c, t_d}.issubset(all_ids)

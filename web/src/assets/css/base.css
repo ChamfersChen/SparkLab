@@ -264,9 +264,9 @@
   padding: 20px 24px;
 }
 
-.panel + .panel {
+/* .panel + .panel {
   margin-top: 16px;
-}
+} */
 
 .panel--flush {
   padding: 0;

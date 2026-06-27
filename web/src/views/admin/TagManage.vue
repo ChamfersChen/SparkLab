@@ -126,7 +126,7 @@ onMounted(fetchData)
   <div class="admin-page">
     <main class="admin-content">
         <div class="page-header">
-          <h2 class="page-title">标签管理</h2>
+          <h1 class="page-title">标签管理</h1>
           <a-button type="primary" @click="showCreate = true">
             <template #icon><Plus :size="16" /></template>
             新增标签
@@ -265,7 +265,7 @@ onMounted(fetchData)
 }
 
 .page-title {
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 600;
   color: var(--color-text);
   margin: 0;

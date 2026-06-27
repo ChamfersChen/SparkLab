@@ -180,3 +180,9 @@ class AuthService:
         if ac:
             await self.db.commit()
         return ac
+
+    async def delete_code(self, code_id: int) -> bool:
+        result = await self.code_repo.delete(code_id)
+        if result:
+            await self.db.commit()
+        return result

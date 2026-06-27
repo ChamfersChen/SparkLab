@@ -7,10 +7,10 @@
  */
 import { ref, onMounted, computed, h } from 'vue'
 import { useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
-import { Plus, Copy, Check, Power, PowerOff, Link, Edit2, Inbox } from 'lucide-vue-next'
+import { message, Modal } from 'ant-design-vue'
+import { Plus, Copy, Check, Power, PowerOff, Link, Edit2, Inbox, Trash2 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
-import { listActivationCodes, generateCodes, toggleCodeStatus, updateCodeNote } from '@/apis/activation_code_api'
+import { listActivationCodes, generateCodes, toggleCodeStatus, updateCodeNote, deleteCode } from '@/apis/activation_code_api'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -89,6 +89,37 @@ async function handleToggle(id) {
   } catch {
     // error handled by base.js
   }
+}
+
+function handleHardDelete(record) {
+  Modal.confirm({
+    title: `删除激活码「${record.code}」?`,
+    content: () =>
+      h('div', null, [
+        h(
+          'p',
+          { style: 'margin-bottom: 8px; color: var(--gray-700);' },
+          '此操作将从数据库中彻底删除该激活码，不可恢复。',
+        ),
+        h('p', { style: 'color: var(--gray-500); font-size: 13px;' }, '仅「未使用」和「已禁用」状态的激活码可被删除。'),
+      ]),
+    okText: '确认删除',
+    cancelText: '取消',
+    okType: 'danger',
+    async onOk() {
+      try {
+        await deleteCode(record.id)
+        message.success('激活码已删除')
+        if (items.value.length === 1 && currentPage.value > 1) {
+          currentPage.value -= 1
+        }
+        await fetchData()
+      } catch (e) {
+        message.error(e?.response?.data?.detail || '删除失败')
+        return Promise.reject(e)
+      }
+    },
+  })
 }
 
 function handleStartEditNote(record) {
@@ -316,6 +347,19 @@ onMounted(fetchData)
                     <Power v-else :size="14" />
                   </a-button>
                 </a-tooltip>
+
+                <a-tooltip
+                  v-if="record.status !== 'used'"
+                  title="删除激活码"
+                >
+                  <a-button
+                    size="small"
+                    class="action-btn-danger"
+                    @click="handleHardDelete(record)"
+                  >
+                    <Trash2 :size="14" />
+                  </a-button>
+                </a-tooltip>
               </div>
             </template>
           </template>
@@ -435,6 +479,15 @@ tr:hover .note-edit-btn,
 .action-btn-warn:hover {
   color: var(--color-warning-900);
   background: var(--color-warning-50);
+}
+
+.action-btn-danger {
+  color: var(--color-error-600);
+}
+
+.action-btn-danger:hover {
+  color: var(--color-error-700);
+  background: var(--color-error-50);
 }
 
 /* ==========================================================================

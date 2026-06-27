@@ -88,3 +88,11 @@ class ActivationCodeRepository:
             )
             await self.db.flush()
         return ac
+
+    async def delete(self, code_id: int) -> bool:
+        ac = await self.db.get(ActivationCode, code_id)
+        if ac and ac.status in (ActivationCodeStatus.UNUSED, ActivationCodeStatus.DISABLED):
+            await self.db.delete(ac)
+            await self.db.flush()
+            return True
+        return False

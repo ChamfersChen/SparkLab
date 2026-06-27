@@ -1,4 +1,4 @@
-import { apiSuperAdminGet, apiSuperAdminPost, apiSuperAdminPut } from './base'
+import { apiSuperAdminGet, apiSuperAdminPost, apiSuperAdminPut, apiSuperAdminDelete } from './base'
 
 function buildQuery(params) {
   const q = new URLSearchParams()
@@ -24,4 +24,8 @@ export function toggleCodeStatus(codeId) {
 
 export function updateCodeNote(codeId, data) {
   return apiSuperAdminPut(`/admin/activation-codes/${codeId}/note`, data)
+}
+
+export function deleteCode(codeId) {
+  return apiSuperAdminDelete(`/admin/activation-codes/${codeId}`)
 }

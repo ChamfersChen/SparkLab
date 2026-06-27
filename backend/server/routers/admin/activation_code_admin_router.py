@@ -4,6 +4,7 @@
 - POST   /api/admin/activation-codes/generate       → 批量生成
 - PUT    /api/admin/activation-codes/{id}/toggle     → 启用/禁用
 - PUT    /api/admin/activation-codes/{id}/note       → 编辑备注
+- DELETE /api/admin/activation-codes/{id}            → 删除（仅未使用/已禁用）
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -86,3 +87,17 @@ async def update_code_note(
     if ac is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="激活码不存在")
     return ActivationCodeWithUser.model_validate(ac)
+
+
+@activation_code_admin.delete("/{code_id}", response_model=MessageResponse)
+async def delete_activation_code(
+    code_id: int,
+    service: AuthService = Depends(_get_service),
+):
+    deleted = await service.delete_code(code_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="激活码不存在或不可删除（仅未使用/已禁用的激活码可删除）",
+        )
+    return MessageResponse(message="激活码已删除")

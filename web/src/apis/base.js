@@ -145,18 +145,49 @@ export async function apiRequest(path, options = {}, requiresAuth = true, respon
 // ---------------------------------------------------------------------------
 // GET
 // ---------------------------------------------------------------------------
-export function apiGet(path, options = {}, requiresAuth = true, responseType = 'json') {
-  return apiRequest(path, { method: 'GET', ...options }, requiresAuth, responseType)
+
+/**
+ * 把 query 对象拼接到 path 上,只忽略 null/undefined/空字符串。
+ * - 数字 0 / 布尔 false 会被保留(后端可能用 0 做有意义的过滤值)
+ * - 数组按 RFC-3986 重复键展开(?tag_ids=1&tag_ids=2);本项目目前未使用,但留扩展位
+ * - 已带 ? 的 path 直接追加 &;否则用 ?
+ */
+function appendQuery(path, query) {
+  if (!query || typeof query !== 'object') return path
+  const sp = new URLSearchParams()
+  for (const [k, v] of Object.entries(query)) {
+    if (v === undefined || v === null || v === '') continue
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        if (item === undefined || item === null || item === '') continue
+        sp.append(k, String(item))
+      }
+    } else {
+      sp.append(k, String(v))
+    }
+  }
+  const qs = sp.toString()
+  if (!qs) return path
+  return path + (path.includes('?') ? '&' : '?') + qs
 }
 
-export function apiAdminGet(path, options = {}, responseType = 'json') {
+/**
+ * apiGet — 第 2 个参数是查询参数对象(不是 fetch options)。
+ * 历史上这里曾错把 query 当 fetch options 展开,导致所有 GET 查询参数被静默丢弃,
+ * 现已统一改为 URLSearchParams 拼到 URL。
+ */
+export function apiGet(path, params = {}, requiresAuth = true, responseType = 'json') {
+  return apiRequest(appendQuery(path, params), { method: 'GET' }, requiresAuth, responseType)
+}
+
+export function apiAdminGet(path, params = {}, responseType = 'json') {
   checkAdminPermission()
-  return apiGet(`/admin${path}`, options, true, responseType)
+  return apiGet(`/admin${path}`, params, true, responseType)
 }
 
-export function apiSuperAdminGet(path, options = {}, responseType = 'json') {
+export function apiSuperAdminGet(path, params = {}, responseType = 'json') {
   checkSuperAdminPermission()
-  return apiGet(path, options, true, responseType)
+  return apiGet(path, params, true, responseType)
 }
 
 // ---------------------------------------------------------------------------

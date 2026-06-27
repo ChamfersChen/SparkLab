@@ -52,6 +52,20 @@ function loadQueryFromUrl() {
   }
 }
 
+/** 把已选 tag 按 category 分组,拼成后端约定的 "1,2;3" 字符串。
+ *  组间 AND、组内 OR;空字符串视为未筛选。 */
+function buildTagIdsParam() {
+  if (!selectedTagIds.value.length) return ''
+  const groups = []
+  for (const tagList of Object.values(tags.value)) {
+    const ids = tagList
+      .filter((t) => selectedTagIds.value.includes(t.id))
+      .map((t) => t.id)
+    if (ids.length) groups.push(ids.join(','))
+  }
+  return groups.join(';')
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -63,8 +77,9 @@ async function fetchData() {
     if (search.value.trim()) {
       params.search = search.value.trim()
     }
-    if (selectedTagIds.value.length) {
-      params.tag_ids = selectedTagIds.value.join(',')
+    const tagIdsParam = buildTagIdsParam()
+    if (tagIdsParam) {
+      params.tag_ids = tagIdsParam
     }
     const res = await listTemplates(params)
     items.value = res.items
@@ -134,12 +149,6 @@ function onPageChange(p, ps) {
   syncQueryToUrl()
 }
 
-const STATUS_LABEL = {
-  draft: { text: '草稿', cls: 'status-tag--draft' },
-  published: { text: '已发布', cls: 'status-tag--published' },
-  archived: { text: '已归档', cls: 'status-tag--archived' },
-}
-
 const hasActiveFilter = computed(
   () =>
     search.value.trim().length > 0 ||
@@ -202,36 +211,43 @@ onMounted(() => {
         </div>
       </header>
 
-      <!-- 搜索 + 排序 + 筛选 — 工具栏卡片化 -->
-      <div class="toolbar-card">
+      <!-- 搜索 + 排序 + 筛选 — 紧凑工具栏 -->
+      <div class="toolbar-card toolbar-card--compact">
         <a-input-search
           v-model:value="search"
           placeholder="搜索模板名称或描述…"
           allow-clear
+          size="small"
           class="search-input"
           @search="onSearchSubmit"
         />
-        <a-select v-model:value="sortBy" style="width: 140px" @change="onSortChange">
+        <a-select v-model:value="sortBy" size="small" style="width: 132px" @change="onSortChange">
           <a-select-option value="use_count">按使用次数</a-select-option>
           <a-select-option value="newest">按最新发布</a-select-option>
         </a-select>
-        <a-button :type="showFilter ? 'primary' : 'default'" @click="showFilter = !showFilter">
-          <template #icon><Filter :size="16" /></template>
-          筛选
-        </a-button>
-        <a-button
+        <button
+          type="button"
+          class="toolbar-btn"
+          :class="{ 'toolbar-btn--active': showFilter || selectedTagIds.length }"
+          @click="showFilter = !showFilter"
+        >
+          <Filter :size="14" />
+          <span>筛选</span>
+          <span v-if="selectedTagIds.length" class="toolbar-badge">{{ selectedTagIds.length }}</span>
+        </button>
+        <button
           v-if="hasActiveFilter"
-          type="text"
-          class="icon-text-btn"
+          type="button"
+          class="toolbar-btn toolbar-btn--ghost"
           @click="clearAllFilters"
         >
-          <X :size="14" />
-          <span>清除全部</span>
-        </a-button>
+          <X :size="12" />
+          <span>清除</span>
+        </button>
       </div>
 
-      <!-- 标签筛选面板 -->
-      <div v-if="showFilter" class="filter-panel">
+      <!-- 标签筛选面板 — 紧凑版 -->
+      <div v-if="showFilter" class="filter-panel filter-panel--compact">
         <div v-for="(tagList, category) in tags" :key="category" class="filter-group">
           <span class="filter-label">{{ { platform: '平台', content_type: '内容类型', industry: '行业/场景' }[category] }}</span>
           <div class="filter-tags">
@@ -249,7 +265,7 @@ onMounted(() => {
       </div>
 
       <!-- 已选标签 -->
-      <div v-if="allSelectedTags.length" class="selected-tags">
+      <!-- <div v-if="allSelectedTags.length" class="selected-tags">
         <span class="selected-label">已选：</span>
         <span
           v-for="t in allSelectedTags"
@@ -260,7 +276,7 @@ onMounted(() => {
           {{ t.name }}
           <X :size="12" />
         </span>
-      </div>
+      </div> -->
 
       <!-- 结果数 -->
       <div v-if="!loading" class="result-summary">
@@ -270,38 +286,29 @@ onMounted(() => {
 
       <!-- 模板列表 -->
       <a-spin :spinning="loading">
-        <div v-if="items.length" class="template-grid">
-          <div
+        <ul v-if="items.length" class="template-list">
+          <li
             v-for="item in items"
             :key="item.id"
-            class="card-base card-hover card-focus template-card"
+            class="template-row"
             tabindex="0"
             @click="goDetail(item.id)"
             @keydown.enter="goDetail(item.id)"
           >
-            <div class="card-header">
-              <h3 class="card-title">{{ item.title }}</h3>
-              <span
-                v-if="item.status && STATUS_LABEL[item.status]"
-                class="status-tag"
-                :class="STATUS_LABEL[item.status].cls"
-              >
-                {{ STATUS_LABEL[item.status].text }}
-              </span>
+            <h3 class="row-title">{{ item.title }}</h3>
+            <div class="row-tags">
+              <template v-if="item.tags?.length">
+                <span v-for="t in item.tags.slice(0, 4)" :key="t.id" class="card-tag">{{ t.name }}</span>
+                <span v-if="item.tags.length > 4" class="tag-more">+{{ item.tags.length - 4 }}</span>
+              </template>
+              <span v-else class="row-tags-empty">—</span>
             </div>
-            <p class="card-desc">{{ item.description }}</p>
-            <div v-if="item.tags?.length" class="card-tags">
-              <span v-for="t in item.tags.slice(0, 3)" :key="t.id" class="card-tag">{{ t.name }}</span>
-              <span v-if="item.tags.length > 3" class="tag-more">+{{ item.tags.length - 3 }}</span>
+            <div class="row-usage">
+              <Clock :size="13" />
+              <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
             </div>
-            <div class="card-meta">
-              <span class="meta-item">
-                <Clock :size="13" />
-                {{ item.use_count || 0 }} 次使用
-              </span>
-            </div>
-          </div>
-        </div>
+          </li>
+        </ul>
 
         <!-- 空态:替换 a-empty 为带图标的 .empty-state -->
         <div v-else-if="!loading" class="empty-state">
@@ -338,51 +345,138 @@ onMounted(() => {
 <style scoped>
 /* 页面顶部 .page-bar__title 用全局 24px(已对齐 design.md),不再局部覆盖 */
 
+/* 紧凑工具栏：覆盖全局 .toolbar-card 的 padding/gap，控件高度统一 28px */
+.toolbar-card--compact {
+  padding: 8px 12px;
+  gap: 8px;
+  border-radius: 8px;
+}
+
+/* 普通 select / button: 直接给最外层圆角 + 28px 高 */
+.toolbar-card--compact :deep(.ant-select-sm .ant-select-selector),
+.toolbar-card--compact :deep(.ant-btn-sm:not(.ant-input-search-button)) {
+  height: 28px;
+  border-radius: 6px;
+}
+
+/* a-input-search 的 DOM 是 group-wrapper > [affix-wrapper, group-addon>button]:
+ * 只给最外层 .ant-input-group-wrapper 设圆角,内部 affix-wrapper / input / button
+ * 都保持矩形,避免内外圆角不一致或底部边框被相邻 addon 截断。 */
+.toolbar-card--compact :deep(.ant-input-search) {
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.toolbar-card--compact :deep(.ant-input-search .ant-input-affix-wrapper),
+.toolbar-card--compact :deep(.ant-input-search .ant-input-search-button) {
+  height: 28px;
+  border-radius: 0;
+}
+
 .search-input {
   flex: 1;
-  max-width: 480px;
-  min-width: 200px;
+  max-width: 420px;
+  min-width: 180px;
+}
+
+/* 自定义紧凑按钮：跟 Ant 小号控件高度对齐 */
+.toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 10px;
+  background: var(--gray-0);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.toolbar-btn:hover {
+  color: var(--color-text);
+  border-color: var(--gray-300);
+}
+
+.toolbar-btn--active {
+  color: var(--main-700);
+  border-color: var(--main-color);
+  background: var(--main-10);
+}
+
+.toolbar-btn--ghost {
+  border-color: transparent;
+  background: transparent;
+}
+
+.toolbar-btn--ghost:hover {
+  background: var(--gray-25);
+  border-color: transparent;
+}
+
+.toolbar-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 2px;
+  background: var(--main-color);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  line-height: 1;
 }
 
 .filter-panel {
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
   border-radius: 8px;
-  padding: 20px 24px;
-  margin-bottom: 16px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
 }
 
-.filter-group {
+.filter-panel--compact .filter-group {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--gray-100);
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--gray-100);
 }
 
-.filter-group:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.filter-group:first-child {
+.filter-panel--compact .filter-group:first-child {
   padding-top: 0;
+}
+
+.filter-panel--compact .filter-group:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
 }
 
 .filter-label {
   flex-shrink: 0;
-  width: 80px;
-  font-size: 13px;
-  color: var(--color-text);
+  width: 72px;
+  font-size: 12px;
+  color: var(--color-text-secondary);
   font-weight: 500;
-  padding-top: 6px;
+  padding-top: 4px;
 }
 
 .filter-tags {
   flex: 1;
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
+}
+
+/* 紧凑模式下的 tag-chip 缩小一档 */
+.filter-panel--compact .tag-chip {
+  padding: 2px 10px;
+  font-size: 12px;
 }
 
 .selected-tags {
@@ -420,52 +514,61 @@ onMounted(() => {
   margin-left: 4px;
 }
 
-.template-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-/* 卡片视觉用全局 .card-base / .card-hover / .card-focus,只补模板特化 */
-.template-card {
+.template-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
   gap: 8px;
 }
 
-.card-title {
-  font-size: 16px;
+.template-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 24px;
+  padding: 14px 20px;
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  outline: none;
+}
+
+.template-row:hover {
+  border-color: var(--main-300, var(--gray-300));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.template-row:focus-visible {
+  border-color: var(--main-500, var(--gray-400));
+  box-shadow: 0 0 0 3px var(--main-100, rgba(0, 0, 0, 0.06));
+}
+
+.row-title {
+  font-size: 15px;
   font-weight: 600;
   color: var(--color-text);
   margin: 0;
   line-height: 1.4;
-  flex: 1;
-}
-
-.card-desc {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.card-tags {
+.row-tags {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  min-height: 24px;
+  min-width: 0;
+}
+
+.row-tags-empty {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
 }
 
 .card-tag {
@@ -485,21 +588,19 @@ onMounted(() => {
   padding-left: 2px;
 }
 
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-  margin-top: auto;
-  padding-top: 8px;
-  border-top: 1px solid var(--gray-100);
-}
-
-.meta-item {
+.row-usage {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+  justify-self: end;
+}
+
+.row-usage strong {
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 .pagination-wrap {
@@ -512,9 +613,13 @@ onMounted(() => {
   .search-input {
     max-width: none;
   }
-  .template-grid {
+  .template-row {
     grid-template-columns: 1fr;
-    gap: 12px;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+  .row-usage {
+    justify-self: start;
   }
   .filter-group {
     flex-direction: column;

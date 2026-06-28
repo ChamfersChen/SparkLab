@@ -334,8 +334,9 @@ onMounted(() => {
               <div class="action-group">
                 <!-- 主操作(图标+文字) -->
                 <a-button size="small" class="action-btn-primary" @click="goEdit(record.id)">
-                  <template #icon><Edit2 :size="14" /></template>
-                  <span>编辑</span>
+                  <!-- <template #icon><Edit2 :size="14" /></template> -->
+                  <!-- <span>编辑</span> -->
+                  编辑
                 </a-button>
                 <a-button
                   v-if="record.status === 'draft'"

@@ -1,3 +1,4 @@
+
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
@@ -25,6 +26,12 @@ const routes = [
     name: 'admin-activation-codes',
     component: () => import('@/views/admin/ActivationCodeManage.vue'),
     meta: { title: '激活码管理', layout: 'app' }
+  },
+  {
+    path: '/admin/admins',
+    name: 'admin-admins',
+    component: () => import('@/views/admin/AdminAccountManage.vue'),
+    meta: { title: '管理员账号', layout: 'app' }
   },
   {
     path: '/admin/tags',
@@ -90,3 +97,4 @@ router.beforeEach((to) => {
 })
 
 export default router
+

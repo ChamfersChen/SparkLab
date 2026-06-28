@@ -138,3 +138,30 @@ class GenerateCodesRequest(BaseModel):
 
 class UpdateNoteRequest(BaseModel):
     note: str | None = None
+
+
+# -- 管理员：账号管理 --
+
+
+class AdminUserInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    username: str
+    role: str
+    is_active: bool
+    created_at: datetime | None = None
+
+    @field_validator("role", mode="before")
+    @classmethod
+    def coerce_role(cls, v):
+        return v.value if hasattr(v, "value") else v
+
+
+class AdminUserListResponse(BaseModel):
+    items: list[AdminUserInfo]
+    total: int
+
+
+class UpdateRoleRequest(BaseModel):
+    role: str

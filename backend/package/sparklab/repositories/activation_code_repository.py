@@ -1,6 +1,7 @@
+
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -57,8 +58,14 @@ class ActivationCodeRepository:
         items = list(result.unique().scalars().all())
         return items, total
 
-    async def create(self, code: str, note: str | None = None, creator_id: int | None = None) -> ActivationCode:
-        ac = ActivationCode(code=code, note=note, creator_id=creator_id)
+    async def create(
+        self,
+        code: str,
+        note: str | None = None,
+        creator_id: int | None = None,
+        is_admin: bool = False,
+    ) -> ActivationCode:
+        ac = ActivationCode(code=code, note=note, creator_id=creator_id, is_admin=is_admin)
         self.db.add(ac)
         await self.db.flush()
         return ac
@@ -96,3 +103,45 @@ class ActivationCodeRepository:
             await self.db.flush()
             return True
         return False
+
+    async def list_admin_codes(
+        self,
+        status_filter: str | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[ActivationCode], int]:
+        query = (
+            select(ActivationCode)
+            .where(ActivationCode.is_admin == True)
+            .options(joinedload(ActivationCode.user))
+            .options(joinedload(ActivationCode.creator))
+        )
+        count_query = select(ActivationCode).where(ActivationCode.is_admin == True)
+
+        if status_filter:
+            query = query.where(ActivationCode.status == status_filter)
+            count_query = count_query.where(ActivationCode.status == status_filter)
+        if search:
+            like = f"%{search}%"
+            query = query.where(
+                ActivationCode.code.ilike(like)
+                | ActivationCode.note.ilike(like)
+                | ActivationCode.user.has(User.username.ilike(like))
+                | ActivationCode.creator.has(User.username.ilike(like))
+            )
+            count_query = count_query.where(
+                ActivationCode.code.ilike(like)
+                | ActivationCode.note.ilike(like)
+                | ActivationCode.user.has(User.username.ilike(like))
+                | ActivationCode.creator.has(User.username.ilike(like))
+            )
+
+        total_result = await self.db.execute(count_query)
+        total = len(total_result.scalars().all())
+
+        query = query.order_by(ActivationCode.created_at.desc()).offset(offset).limit(limit)
+        result = await self.db.execute(query)
+        items = list(result.unique().scalars().all())
+        return items, total
+

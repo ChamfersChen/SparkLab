@@ -175,9 +175,9 @@ onMounted(fetchData)
 
           <p v-if="template.description" class="page-bar__sub page-bar__sub--detail">{{ template.description }}</p>
 
-          <div v-if="template.tags?.length" class="hero-tags">
+          <!-- <div v-if="template.tags?.length" class="hero-tags">
             <a-tag v-for="t in template.tags" :key="t.id" class="hero-tag">{{ t.name }}</a-tag>
-          </div>
+          </div> -->
 
           <!-- 主操作区(放 hero 之下,内容之上,符合「主操作靠近内容」) -->
           <div class="primary-cta">

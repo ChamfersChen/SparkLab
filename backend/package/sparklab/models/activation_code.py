@@ -33,6 +33,7 @@ class ActivationCode(Base, TimestampMixin):
         nullable=True,
     )
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_admin: Mapped[bool] = mapped_column(default=False, nullable=False)
 
     creator_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),

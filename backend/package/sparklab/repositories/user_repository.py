@@ -1,4 +1,5 @@
-from sqlalchemy import select
+
+from sqlalchemy import select, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sparklab.models.user import User, UserRole
@@ -41,3 +42,59 @@ class UserRepository:
         if user:
             user.password_hash = new_hash
             await self.db.flush()
+
+    async def list_admins(
+        self,
+        role_filter: str | None = None,
+        active_filter: bool | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[User], int]:
+        query = select(User).where(
+            or_(User.role == UserRole.ADMIN, User.role == UserRole.SUPER_ADMIN)
+        )
+
+        if role_filter:
+            query = query.where(User.role == role_filter)
+
+        if active_filter is not None:
+            query = query.where(User.is_active == active_filter)
+
+        if search:
+            query = query.where(User.username.ilike(f"%{search}%"))
+
+        # 计数
+        count_query = select(func.count()).select_from(query.subquery())
+        count_result = await self.db.execute(count_query)
+        total = count_result.scalar() or 0
+
+        # 分页
+        query = query.order_by(User.created_at.desc()).offset(offset).limit(limit)
+        result = await self.db.execute(query)
+        users = result.scalars().all()
+
+        return list(users), total
+
+    async def update_role(self, user_id: int, new_role: UserRole) -> User | None:
+        user = await self.get_by_id(user_id)
+        if user:
+            user.role = new_role
+            await self.db.flush()
+        return user
+
+    async def toggle_active(self, user_id: int) -> User | None:
+        user = await self.get_by_id(user_id)
+        if user:
+            user.is_active = not user.is_active
+            await self.db.flush()
+        return user
+
+    async def delete_user(self, user_id: int) -> bool:
+        user = await self.get_by_id(user_id)
+        if user:
+            await self.db.delete(user)
+            await self.db.flush()
+            return True
+        return False
+

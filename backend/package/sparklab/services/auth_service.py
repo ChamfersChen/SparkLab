@@ -1,3 +1,4 @@
+
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -61,11 +62,14 @@ class AuthService:
                 detail="用户名已被占用",
             )
 
+        # 根据激活码类型决定用户角色
+        role = UserRole.ADMIN if ac.is_admin else UserRole.USER
+
         pwd_hash = hash_password(password)
         user = await self.user_repo.create(
             username=username,
             password_hash=pwd_hash,
-            role=UserRole.USER,
+            role=role,
             activation_code_id=ac.id,
         )
         await self.code_repo.mark_used(ac.id, user.id)
@@ -150,12 +154,15 @@ class AuthService:
     # -- 生成激活码 --
 
     async def generate_codes(
-        self, count: int, note: str | None = None, creator_id: int | None = None
+        self,
+        count: int,
+        note: str | None = None,
+        creator_id: int | None = None,
     ) -> list[ActivationCode]:
         codes = []
         for _ in range(count):
             raw = generate_code()
-            ac = await self.code_repo.create(raw, note, creator_id)
+            ac = await self.code_repo.create(raw, note, creator_id, is_admin=False)
             codes.append(ac)
         await self.db.commit()
         return codes
@@ -186,3 +193,108 @@ class AuthService:
         if result:
             await self.db.commit()
         return result
+
+    # ========== 管理员账号管理 ==========
+
+    async def list_admin_users(
+        self,
+        role_filter: str | None = None,
+        active_filter: bool | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[User], int]:
+        return await self.user_repo.list_admins(
+            role_filter, active_filter, search, offset, limit
+        )
+
+    async def update_user_role(self, user_id: int, new_role: str, current_user_id: int) -> User:
+        # 不能修改自己的角色
+        if user_id == current_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="不能修改自己的角色",
+            )
+
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在",
+            )
+
+        # 验证角色值
+        try:
+            role_enum = UserRole(new_role)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="无效的角色值",
+            )
+
+        updated = await self.user_repo.update_role(user_id, role_enum)
+        await self.db.commit()
+        return updated
+
+    async def toggle_user_active(self, user_id: int, current_user_id: int) -> User:
+        # 不能禁用自己
+        if user_id == current_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="不能禁用自己的账号",
+            )
+
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在",
+            )
+
+        updated = await self.user_repo.toggle_active(user_id)
+        await self.db.commit()
+        return updated
+
+    async def delete_user(self, user_id: int, current_user_id: int) -> bool:
+        # 不能删除自己
+        if user_id == current_user_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="不能删除自己的账号",
+            )
+
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在",
+            )
+
+        result = await self.user_repo.delete_user(user_id)
+        if result:
+            await self.db.commit()
+        return result
+
+    async def generate_admin_codes(
+        self,
+        count: int,
+        note: str | None = None,
+        creator_id: int | None = None,
+    ) -> list[ActivationCode]:
+        codes = []
+        for _ in range(count):
+            raw = generate_code()
+            ac = await self.code_repo.create(raw, note, creator_id, is_admin=True)
+            codes.append(ac)
+        await self.db.commit()
+        return codes
+
+    async def list_admin_codes(
+        self,
+        status_filter: str | None = None,
+        search: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[ActivationCode], int]:
+        return await self.code_repo.list_admin_codes(status_filter, search, offset, limit)
+

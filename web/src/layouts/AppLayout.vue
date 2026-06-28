@@ -55,10 +55,12 @@ const adminNavItems = computed(() => {
     { name: '模板管理', path: '/admin/templates', icon: FileText },
     { name: '工作流管理', path: '/admin/playbooks', icon: BookOpen },
     { name: '资讯管理', path: '/admin/news', icon: Newspaper },
-    { name: '标签管理', path: '/admin/tags', icon: Tag },
     { name: '数据看板', path: '/admin/dashboard', icon: BarChart3 },
   ]
   if (userStore.isSuperAdmin) {
+    items.unshift( 
+      { name: '标签管理', path: '/admin/tags', icon: Tag },
+    )
     items.push(
       { name: '激活码管理', path: '/admin/activation-codes', icon: KeyRound },
       { name: '管理员账号', path: '/admin/admins', icon: Shield },

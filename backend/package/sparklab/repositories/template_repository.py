@@ -1,7 +1,6 @@
 """模板数据访问层。"""
 
 import json
-from datetime import datetime
 
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,7 +50,6 @@ class TemplateRepository:
             count_query = count_query.where(Template.status == status)
 
         # 标签筛选：组间 AND、组内 OR
-        # 每个组生成一个 EXISTS 子查询(模板至少匹配组内一个 tag),多组用 AND 拼接。
         if tag_id_groups:
             for group in tag_id_groups:
                 if not group:
@@ -73,26 +71,19 @@ class TemplateRepository:
         else:
             query = query.order_by(Template.use_count.desc(), Template.created_at.desc())
 
-        # 总数
         total_result = await self.db.execute(count_query)
         total = total_result.scalar() or 0
 
-        # 分页
         query = query.offset(offset).limit(limit)
         result = await self.db.execute(query)
         items = list(result.scalars().all())
-
         return items, total
 
     async def create(
         self,
         title: str,
         description: str,
-        role: str,
-        goal: str,
-        input: str,
-        output: str,
-        example: str,
+        content: str,
         variable_hints: dict | None = None,
         status: str = "draft",
         creator_id: int | None = None,
@@ -101,11 +92,7 @@ class TemplateRepository:
         template = Template(
             title=title,
             description=description,
-            role=role,
-            goal=goal,
-            input=input,
-            output=output,
-            example=example,
+            content=content,
             variable_hints=json.dumps(variable_hints, ensure_ascii=False) if variable_hints else None,
             status=TemplateStatus(status),
             creator_id=creator_id,
@@ -145,9 +132,7 @@ class TemplateRepository:
 
         await self.db.flush()
 
-        # 更新标签关联
         if tag_ids is not None:
-            # 删除旧关联
             await self.db.execute(
                 TemplateTag.__table__.delete().where(TemplateTag.template_id == template_id)
             )
@@ -177,16 +162,11 @@ class TemplateRepository:
         template = await self.db.get(Template, template_id)
         if not template:
             return False
-        # 软删除：改为 archived
         template.status = TemplateStatus.ARCHIVED
         await self.db.flush()
         return True
 
     async def hard_delete(self, template_id: int) -> bool:
-        """物理删除：移除 DB 记录。
-
-        template_tags 关联靠 TemplateTag.template_id 外键的 ondelete=CASCADE 自动清理。
-        """
         template = await self.db.get(Template, template_id)
         if not template:
             return False

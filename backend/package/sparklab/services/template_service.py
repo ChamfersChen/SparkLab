@@ -1,6 +1,5 @@
 """模板业务逻辑层。"""
 
-import json
 import re
 
 from fastapi import HTTPException, status
@@ -12,34 +11,37 @@ from sparklab.models.template import Template
 from sparklab.repositories.template_repository import TemplateRepository
 
 
+_VAR_REGEX = re.compile(r"\{\{(.*?)\}\}")
+
+
 class TemplateService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.repo = TemplateRepository(db)
 
     @staticmethod
-    def _extract_variables(input_text: str) -> list[str]:
-        """从 Input 段中提取所有 {{变量名}}。"""
-        return list(dict.fromkeys(re.findall(r"\{\{(.*?)\}\}", input_text)))
+    def _extract_variables(content: str) -> list[str]:
+        """从 content 中提取所有 {{变量名}}。"""
+        return list(dict.fromkeys(m.strip() for m in _VAR_REGEX.findall(content or "")))
 
     @staticmethod
     def _validate_variable_hints_coverage(
-        input_text: str, variable_hints: dict | None
+        content: str, variable_hints: dict | None
     ) -> None:
-        """校验 Input 段出现的 {{变量}} 都被 variable_hints 覆盖。
+        """校验 content 中出现的 {{变量}} 都被 variable_hints 覆盖。
 
         当 variable_hints 为 None 时视为「按需配置」,不强制覆盖;
-        当 variable_hints 为 dict(允许空 dict)时,Input 段里出现的每个变量都必须有 hint。
+        当 variable_hints 为 dict(允许空 dict)时,content 里出现的每个变量都必须有 hint。
         """
         if variable_hints is None:
             return
-        used = set(TemplateService._extract_variables(input_text))
+        used = set(TemplateService._extract_variables(content))
         covered = set(variable_hints.keys())
         missing = sorted(used - covered)
         if missing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"以下变量在 Input 段出现但未在 variable_hints 中配置：{', '.join(missing)}",
+                detail=f"以下变量在 content 中出现但未在 variable_hints 中配置：{', '.join(missing)}",
             )
 
     async def _validate_tag_ids(self, tag_ids: list[int] | None) -> None:
@@ -75,12 +77,6 @@ class TemplateService:
         )
 
     async def get_template(self, template_id: int) -> Template | None:
-        """获取模板。
-
-        不做作者可见性过滤，调用方需自行决定是否使用 get_template_for_user。
-        不在 instance 上修改 variable_hints(避免污染 SQLAlchemy session 的 dirty 状态)；
-        hints 的 JSON 解析由 Pydantic 响应模型的 parse_hints 字段 validator 负责。
-        """
         return await self.repo.get_by_id(template_id)
 
     async def get_template_for_user(
@@ -111,26 +107,18 @@ class TemplateService:
         self,
         title: str,
         description: str,
-        role: str,
-        goal: str,
-        input: str,
-        output: str,
-        example: str,
+        content: str = "",
         creator_id: int | None = None,
         variable_hints: dict | None = None,
         tag_ids: list[int] | None = None,
         status: str = "draft",
     ):
         await self._validate_tag_ids(tag_ids)
-        self._validate_variable_hints_coverage(input, variable_hints)
+        self._validate_variable_hints_coverage(content, variable_hints)
         template = await self.repo.create(
             title=title,
             description=description,
-            role=role,
-            goal=goal,
-            input=input,
-            output=output,
-            example=example,
+            content=content,
             variable_hints=variable_hints,
             status=status,
             creator_id=creator_id,
@@ -148,9 +136,9 @@ class TemplateService:
         if tag_ids is not None:
             await self._validate_tag_ids(tag_ids)
         variable_hints = kwargs.get("variable_hints")
-        input_text = kwargs.get("input")
-        if variable_hints is not None and input_text is not None:
-            self._validate_variable_hints_coverage(input_text, variable_hints)
+        content = kwargs.get("content")
+        if variable_hints is not None and content is not None:
+            self._validate_variable_hints_coverage(content, variable_hints)
         template = await self.repo.update(template_id, **kwargs)
         if not template:
             raise HTTPException(
@@ -188,10 +176,8 @@ class TemplateService:
     async def hard_delete_template(self, template_id: int) -> None:
         """物理删除模板（仅超管使用）。
 
-        从 DB 中删除该条记录；template_tags 关联靠 CASCADE 自动清理。
-        不可恢复，请确认后调用。
-
-        约束：已发布（published）模板不允许直接删除，需先在管理列表中下线为 archived。
+        约束: 已发布（published）模板不允许直接删除，需先在管理列表中下线为 archived。
+        （Playbook 不再引用 Template, 故无需跨模块引用检查。）
         """
         template = await self.repo.get_by_id(template_id)
         if template is None:
@@ -221,7 +207,6 @@ class TemplateService:
         await self.repo.increment_use_count(template_id)
         await self.db.commit()
 
-    async def extract_variables(self, input_text: str) -> dict:
-        """解析 Input 段变量并返回变量清单（无持久化）。"""
-        variables = self._extract_variables(input_text)
+    async def extract_variables(self, content: str) -> dict:
+        variables = self._extract_variables(content)
         return {"variables": variables}

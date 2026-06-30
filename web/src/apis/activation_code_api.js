@@ -11,21 +11,21 @@ function buildQuery(params) {
 
 export function listActivationCodes(params = {}) {
   const qs = buildQuery(params)
-  return apiSuperAdminGet(`/admin/activation-codes${qs}`)
+  return apiSuperAdminGet(`/activation-codes${qs}`)
 }
 
 export function generateCodes(data) {
-  return apiSuperAdminPost('/admin/activation-codes/generate', data)
+  return apiSuperAdminPost('/activation-codes/generate', data)
 }
 
 export function toggleCodeStatus(codeId) {
-  return apiSuperAdminPut(`/admin/activation-codes/${codeId}/toggle`)
+  return apiSuperAdminPut(`/activation-codes/${codeId}/toggle`)
 }
 
 export function updateCodeNote(codeId, data) {
-  return apiSuperAdminPut(`/admin/activation-codes/${codeId}/note`, data)
+  return apiSuperAdminPut(`/activation-codes/${codeId}/note`, data)
 }
 
 export function deleteCode(codeId) {
-  return apiSuperAdminDelete(`/admin/activation-codes/${codeId}`)
+  return apiSuperAdminDelete(`/activation-codes/${codeId}`)
 }

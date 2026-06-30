@@ -76,6 +76,36 @@ const routes = [
     meta: { title: '编辑模板', layout: 'app' }
   },
   {
+    path: '/playbooks',
+    name: 'playbooks',
+    component: () => import('@/views/playbooks/PlaybookList.vue'),
+    meta: { title: '工作流', layout: 'app' }
+  },
+  {
+    path: '/playbooks/:id',
+    name: 'playbook-run',
+    component: () => import('@/views/playbooks/PlaybookRun.vue'),
+    meta: { title: '工作流运行', layout: 'app' }
+  },
+  {
+    path: '/admin/playbooks',
+    name: 'admin-playbooks',
+    component: () => import('@/views/admin/PlaybookManage.vue'),
+    meta: { title: '工作流管理', layout: 'app' }
+  },
+  {
+    path: '/admin/playbooks/create',
+    name: 'admin-playbook-create',
+    component: () => import('@/views/admin/PlaybookEditor.vue'),
+    meta: { title: '新建工作流', layout: 'app' }
+  },
+  {
+    path: '/admin/playbooks/:id/edit',
+    name: 'admin-playbook-edit',
+    component: () => import('@/views/admin/PlaybookEditor.vue'),
+    meta: { title: '编辑工作流', layout: 'app' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/views/NotFoundView.vue'),

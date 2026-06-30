@@ -1,21 +1,18 @@
 """模板模型。
 
-模板使用五段式结构（Role / Goal / Input / Output / Example），
+模板只保留一个 `content` 字段(Markdown 文本),支持 `{{变量名}}` 占位符。
+运行期由用户填变量,后端做替换,再渲染成最终 prompt。
 通过 `template_tags` 与标签建立多对多关联。
 """
 
 import enum
-from datetime import datetime
 
 from sqlalchemy import (
-    Column,
-    DateTime,
     Enum,
     ForeignKey,
     Integer,
     String,
     Text,
-    func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -48,12 +45,8 @@ class Template(Base, TimestampMixin):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[str] = mapped_column(String(500), nullable=False)
 
-    # 五段式内容
-    role: Mapped[str] = mapped_column(Text, nullable=False)
-    goal: Mapped[str] = mapped_column(Text, nullable=False)
-    input: Mapped[str] = mapped_column(Text, nullable=False)
-    output: Mapped[str] = mapped_column(Text, nullable=False)
-    example: Mapped[str] = mapped_column(Text, nullable=False)
+    # 单一内容字段 (Markdown),支持 {{变量名}} 占位符
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
 
     # 变量填写提示（JSON 格式：{"变量名": "提示文案"}）
     variable_hints: Mapped[str | None] = mapped_column(Text, nullable=True)

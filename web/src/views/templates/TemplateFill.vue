@@ -51,7 +51,7 @@ function escapeRegex(s) {
 /** 必填变量名列表 = Input 段中提取的变量 ∪ variable_hints 的 key（去重、按出现顺序）。 */
 const variables = computed(() => {
   if (!data.value) return []
-  const inputVars = extractVariables(data.value.input || '')
+  const inputVars = extractVariables(data.value.content || '')
   const hintKeys = Object.keys(data.value.variable_hints || {})
   const seen = new Set()
   const merged = []
@@ -162,20 +162,14 @@ function clearDraft() {
 function generatePrompt() {
   if (!data.value || !canGenerate.value) return
   const d = data.value
-  let filledInput = d.input
+  let filled = d.content || ''
   for (const [key, val] of Object.entries(formValues.value)) {
-    filledInput = filledInput.replaceAll(
+    filled = filled.replaceAll(
       new RegExp(`\\{\\{\\s*${escapeRegex(key)}\\s*\\}\\}`, 'g'),
       val.trim()
     )
   }
-  generatedPrompt.value = [
-    `## Role（角色定义）\n${d.role}`,
-    `## Goal（目标说明）\n${d.goal}`,
-    `## Input（输入信息）\n${filledInput}`,
-    `## Output（输出要求）\n${d.output}`,
-    `## Example（示例效果）\n${d.example}`,
-  ].join('\n\n---\n\n')
+  generatedPrompt.value = filled
   lastGeneratedAt.value = Date.now()
   persistDraft()
   incrementUseCount(d.template_id || route.params.id).catch(() => {

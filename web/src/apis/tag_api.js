@@ -10,17 +10,17 @@ export function listTags(params = {}) {
     if (v !== undefined && v !== null && v !== '') q.append(k, v)
   })
   const qs = q.toString()
-  return apiSuperAdminGet(`/admin/tags${qs ? `?${qs}` : ''}`)
+  return apiSuperAdminGet(`/tags${qs ? `?${qs}` : ''}`)
 }
 
 export function createTag(data) {
-  return apiSuperAdminPost('/admin/tags', data)
+  return apiSuperAdminPost('/tags', data)
 }
 
 export function updateTag(id, data) {
-  return apiSuperAdminPut(`/admin/tags/${id}`, data)
+  return apiSuperAdminPut(`/tags/${id}`, data)
 }
 
 export function deleteTag(id) {
-  return apiSuperAdminDelete(`/admin/tags/${id}`)
+  return apiSuperAdminDelete(`/tags/${id}`)
 }

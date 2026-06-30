@@ -93,7 +93,7 @@ async def get_fill_data(
     current_user: User = Depends(get_required_user),
     service: TemplateService = Depends(_get_service),
 ):
-    """获取模板填写页所需数据（变量清单 + hints）。"""
+    """获取模板填写页所需数据（content + 变量提示）。"""
     template = await service.get_template_for_user(template_id, current_user.id)
     if template is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="模板不存在")
@@ -101,11 +101,7 @@ async def get_fill_data(
         template_id=template.id,
         title=template.title,
         description=template.description,
-        role=template.role,
-        goal=template.goal,
-        input=template.input,
-        output=template.output,
-        example=template.example,
+        content=template.content or "",
         variable_hints=template.variable_hints or {},
     )
 

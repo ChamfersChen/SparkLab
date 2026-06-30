@@ -26,11 +26,8 @@ class TemplateResponse(BaseModel):
     id: int
     title: str
     description: str
-    role: str
-    goal: str
-    input: str
-    output: str
-    example: str
+    # 单一 content 字段,支持 Markdown + {{变量名}} 占位符
+    content: str
     variable_hints: dict[str, str] | None = None
     status: str
     use_count: int
@@ -66,11 +63,7 @@ class TemplateListResponse(BaseModel):
 class TemplateCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=200)
     description: str = Field(..., min_length=1, max_length=500)
-    role: str = Field(..., min_length=1)
-    goal: str = Field(..., min_length=1)
-    input: str = Field(..., min_length=1)
-    output: str = Field(..., min_length=1)
-    example: str = Field(..., min_length=1)
+    content: str = ""
     variable_hints: dict[str, str] | None = None
     tag_ids: list[int] = []
     status: TemplateStatusLiteral = "draft"
@@ -79,11 +72,7 @@ class TemplateCreateRequest(BaseModel):
 class TemplateUpdateRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, min_length=1, max_length=500)
-    role: str | None = Field(default=None, min_length=1)
-    goal: str | None = Field(default=None, min_length=1)
-    input: str | None = Field(default=None, min_length=1)
-    output: str | None = Field(default=None, min_length=1)
-    example: str | None = Field(default=None, min_length=1)
+    content: str | None = None
     variable_hints: dict[str, str] | None = None
     tag_ids: list[int] | None = None
     status: TemplateStatusLiteral | None = None
@@ -108,11 +97,7 @@ class FillDataResponse(BaseModel):
     template_id: int
     title: str
     description: str
-    role: str
-    goal: str
-    input: str
-    output: str
-    example: str
+    content: str
     variable_hints: dict[str, str] | str = {}
 
     @field_validator("variable_hints", mode="before")

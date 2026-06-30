@@ -2,29 +2,15 @@
 /**
  * 模板详情预览页（用户端）。
  *
- * 布局参考 docs/design.md：
- * - 顶部：面包屑(返回) + 状态徽标 + 标题 + 描述 + 标签
- * - 中部：五段式段卡(Role / Goal / Input / Output / Example),统一卡片样式
- * - 下方：变量填写区(variable_hints 完整呈现)
- * - 底部：主 CTA「立即使用」+ 次操作「返回模板库」
- *
- * 变量来源 = input 段提取 ∪ variable_hints 的 key,避免 hints 有但 input 没用上时被吞。
+ * 重构：不再按 5 段（Role/Goal/Input/Output/Example）拆开,直接渲染 Markdown 化的
+ * `content` 字段（与编辑器一致），并把 `{{var}}` 占位符在预览里高亮成 chip,
+ * 让用户一眼看到要填的变量。
  */
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import {
-  ArrowRight,
-  ChevronLeft,
-  Clock,
-  User,
-  FileText,
-  Sparkles,
-  Target,
-  PenLine,
-  ListChecks,
-  Eye,
-} from 'lucide-vue-next'
+import { ArrowRight, ChevronLeft, Clock, FileText, Sparkles } from 'lucide-vue-next'
+import MarkdownIt from 'markdown-it'
 import { getTemplate } from '@/apis/template_api'
 import { extractVariables } from '@/composables/useTemplateVariables'
 
@@ -59,20 +45,20 @@ function goBack() {
   router.push({ name: 'templates' })
 }
 
-// 变量来源 = input 段 ∪ variable_hints 的 key
+// 变量来源 = content 提取 ∪ variable_hints 的 key
 const variables = computed(() => {
   if (!template.value) return []
-  const inputVars = extractVariables(template.value.input)
+  const contentVars = extractVariables(template.value.content)
   const hintKeys = Object.keys(template.value.variable_hints || {})
   const seen = new Set()
   const merged = []
-  for (const v of [...inputVars, ...hintKeys]) {
+  for (const v of [...contentVars, ...hintKeys]) {
     if (!seen.has(v)) {
       seen.add(v)
       merged.push({
         name: v,
         hint: template.value.variable_hints?.[v] || null,
-        usedInInput: inputVars.includes(v),
+        usedInContent: contentVars.includes(v),
       })
     }
   }
@@ -85,55 +71,68 @@ const STATUS_LABEL = {
   archived: { text: '已归档', cls: 'status-tag--archived' },
 }
 
-// 五段式定义,顺序固定;按 data 是否非空决定是否渲染
-const sections = computed(() => {
-  if (!template.value) return []
-  const t = template.value
-  return [
-    {
-      key: 'role',
-      icon: User,
-      label: 'Role · 角色定义',
-      tone: 'role',
-      content: t.role,
-    },
-    {
-      key: 'goal',
-      icon: Target,
-      label: 'Goal · 目标说明',
-      tone: 'goal',
-      content: t.goal,
-    },
-    {
-      key: 'input',
-      icon: PenLine,
-      label: 'Input · 变量定义',
-      tone: 'input',
-      content: t.input,
-      note: variables.value.length
-        ? `共 ${variables.value.length} 个变量，使用 {{变量名}} 语法`
-        : '无变量,可直接生成提示词',
-    },
-    {
-      key: 'output',
-      icon: ListChecks,
-      label: 'Output · 输出要求',
-      tone: 'output',
-      content: t.output,
-    },
-    {
-      key: 'example',
-      icon: Eye,
-      label: 'Example · 示例效果',
-      tone: 'example',
-      content: t.example,
-    },
-  ]
-})
-
 const createdAtText = computed(() => {
   if (!template.value?.created_at) return ''
   return new Date(template.value.created_at).toLocaleDateString('zh-CN')
+})
+
+/**
+ * Markdown 渲染：与编辑器 / TemplateFill / PlaybookRun 保持同一份配置。
+ * 渲染前先把 {{var}} 替换为唯一标记字符串 (PBKVAR 包裹的数字),
+ * 渲染后再批量替换成 chip 元素。这样不用改 markdown-it 自身,
+ * 也不破坏链接等已有渲染;标记字符串故意选不常见字符组合,
+ * 不会与 Markdown 正文冲突。
+ */
+const PBKVAR_OPEN = 'PBKVAR'
+const PBKVAR_CLOSE = 'PBKVARC'
+
+function escapeAttr(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+const md = new MarkdownIt({ html: false, linkify: true, breaks: true }).use((m) => {
+  const defaultOpen =
+    m.renderer.rules.link_open ||
+    function (tokens, idx, options, _env, self) {
+      return self.renderToken(tokens, idx, options)
+    }
+  m.renderer.rules.link_open = function (tokens, idx, options, env, self) {
+    const t = tokens[idx]
+    t.attrSet('target', '_blank')
+    t.attrSet('rel', 'noopener noreferrer')
+    return defaultOpen(tokens, idx, options, env, self)
+  }
+})
+
+const renderedContent = computed(() => {
+  if (!template.value?.content) return ''
+  // 用占位符预先把 {{var}} 替换,渲染后再批量还原成 chip HTML
+  const varMap = []
+  const prepared = (template.value.content || '').replace(
+    /\{\{(.*?)\}\}/g,
+    (_, name) => {
+      const trimmed = name.trim()
+      varMap.push(trimmed)
+      return PBKVAR_OPEN + (varMap.length - 1) + PBKVAR_CLOSE
+    }
+  )
+  const html = md.render(prepared)
+  // PBKVAR 标记替换为 chip span
+  const placeholderRe = new RegExp(PBKVAR_OPEN + '(\\d+)' + PBKVAR_CLOSE, 'g')
+  return html.replace(placeholderRe, (_, idx) => {
+    const name = varMap[Number(idx)] || ''
+    return (
+      '<span class="md-var-chip" title="变量 ' +
+      escapeAttr(name) +
+      '">{{' +
+      escapeAttr(name) +
+      '}}</span>'
+    )
+  })
 })
 
 onMounted(fetchData)
@@ -144,10 +143,9 @@ onMounted(fetchData)
     <div class="page-content">
       <a-spin :spinning="loading">
         <template v-if="template">
-          <!-- 顶部:图标+返回+标题(左),状态+使用量+发布时间(右) -->
+          <!-- 顶部:返回+标题(左),状态+使用量+发布时间(右) -->
           <header class="page-bar page-bar--detail">
             <div class="page-bar__left-group">
-              <!-- <FileText :size="20" class="page-bar__icon" /> -->
               <button type="button" class="icon-text-btn" @click="goBack">
                 <ChevronLeft :size="16" />
                 <span>返回</span>
@@ -175,11 +173,7 @@ onMounted(fetchData)
 
           <p v-if="template.description" class="page-bar__sub page-bar__sub--detail">{{ template.description }}</p>
 
-          <!-- <div v-if="template.tags?.length" class="hero-tags">
-            <a-tag v-for="t in template.tags" :key="t.id" class="hero-tag">{{ t.name }}</a-tag>
-          </div> -->
-
-          <!-- 主操作区(放 hero 之下,内容之上,符合「主操作靠近内容」) -->
+          <!-- 主操作区 -->
           <div class="primary-cta">
             <a-button
               type="primary"
@@ -192,39 +186,38 @@ onMounted(fetchData)
             </a-button>
             <span class="cta-hint">
               <ArrowRight :size="14" />
-              填写 {{ variables.length }} 个变量,生成可直接粘贴的 Prompt
+              <template v-if="variables.length">
+                填写 {{ variables.length }} 个变量（已用 chip 标出），生成可直接粘贴的 Prompt
+              </template>
+              <template v-else>
+                无变量,点击按钮直接生成 Prompt
+              </template>
             </span>
           </div>
 
-          <!-- 主体:左侧内容(五段式 + 变量) -->
+          <!-- 主体:Prompt 预览(单卡片) + 变量提示 -->
           <div class="detail-layout">
             <main class="detail-main">
-              <!-- 五段式卡片 -->
-              <section
-                v-for="s in sections"
-                :key="s.key"
-                class="section"
-                :class="`section--${s.tone}`"
-              >
+              <!-- Prompt 预览 -->
+              <section class="section section--preview">
                 <h2 class="section-title">
-                  <component :is="s.icon" :size="18" class="section-icon" />
-                  {{ s.label }}
+                  <FileText :size="18" class="section-icon" />
+                  Prompt 预览
                 </h2>
-                <p
-                  v-if="s.note"
-                  class="section-note"
-                >
-                  {{ s.note }}
-                </p>
                 <div class="section-body">
-                  <pre class="section-text">{{ s.content }}</pre>
+                  <div
+                    v-if="template.content"
+                    class="preview-md"
+                    v-html="renderedContent"
+                  ></div>
+                  <div v-else class="preview-empty">模板作者未填写 Prompt 内容</div>
                 </div>
               </section>
 
               <!-- 变量填写提示 -->
               <section v-if="variables.length" class="section section--vars">
                 <h2 class="section-title">
-                  <FileText :size="18" class="section-icon" />
+                  <Sparkles :size="18" class="section-icon" />
                   需要填写的信息
                   <span class="section-badge">{{ variables.length }} 项</span>
                 </h2>
@@ -235,11 +228,11 @@ onMounted(fetchData)
                     class="var-item"
                   >
                     <div class="var-row">
-                      <span class="var-name">{{ v.name }}</span>
+                      <code class="var-name">{{ v.name }}</code>
                       <span
-                        v-if="!v.usedInInput"
+                        v-if="!v.usedInContent"
                         class="var-pill"
-                        title="该变量在 Input 段未通过 {{}} 引用,仅作为提示项"
+                        title="该变量在内容中未通过 {{}} 引用,仅作为提示项"
                       >
                         仅提示
                       </span>
@@ -254,7 +247,7 @@ onMounted(fetchData)
             </main>
           </div>
 
-          <!-- 底部:次操作(返回) -->
+          <!-- 底部:次操作 -->
           <footer class="page-footer">
             <a-button @click="goBack">返回模板库</a-button>
           </footer>
@@ -265,14 +258,6 @@ onMounted(fetchData)
 </template>
 
 <style scoped>
-/* ==========================================================================
- * 页面骨架 - 已迁移到全局 .page-bg / .page-content / .page-bar
- * Hero 内部块(.hero-meta / .meta-item / .hero-tags / .hero-tag) 保留在组件内
- * ========================================================================== */
-
-/* ==========================================================================
- * 覆盖全局 .page-content 左右内边距,让内容铺满
- * ========================================================================== */
 .page-content {
   padding: 24px 0;
 }
@@ -281,9 +266,6 @@ onMounted(fetchData)
   font-size: 20px;
 }
 
-/* ==========================================================================
- * 顶部栏
- * ========================================================================== */
 .page-bar--detail {
   padding: 0 24px;
 }
@@ -292,11 +274,6 @@ onMounted(fetchData)
   display: inline-flex;
   align-items: center;
   gap: 8px;
-}
-
-.page-bar__icon {
-  color: var(--main-color);
-  flex-shrink: 0;
 }
 
 .page-bar__right-meta {
@@ -313,29 +290,13 @@ onMounted(fetchData)
   margin-bottom: 16px;
 }
 
-.hero-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 24px;
-  margin-bottom: 24px;
-}
-
-.hero-tag {
-  background: var(--main-10);
-  border-color: var(--main-30);
-  color: var(--main-700);
-}
-
 .meta-item {
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
-/* ==========================================================================
- * 主操作区
- * ========================================================================== */
+/* 主操作区 */
 .primary-cta {
   display: flex;
   align-items: center;
@@ -343,9 +304,8 @@ onMounted(fetchData)
   gap: 16px;
   padding: 20px 24px;
   background: var(--main-10);
-  border: 1px solid var(--main-30);
-  border-left: none;
-  border-right: none;
+  border-top: 1px solid var(--main-30);
+  border-bottom: 1px solid var(--main-30);
   margin-bottom: 24px;
 }
 
@@ -353,16 +313,11 @@ onMounted(fetchData)
   min-width: 200px;
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(59, 130, 246, 0.15);
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow 0.15s ease;
 }
 
 .cta-btn:hover {
   box-shadow: 0 6px 16px rgba(59, 130, 246, 0.28);
-}
-
-.cta-btn:focus-visible {
-  outline: 2px solid var(--main-200);
-  outline-offset: 2px;
 }
 
 .cta-hint {
@@ -373,9 +328,6 @@ onMounted(fetchData)
   font-size: 13px;
 }
 
-/* ==========================================================================
- * 主体布局
- * ========================================================================== */
 .detail-layout {
   display: flex;
   gap: 24px;
@@ -386,9 +338,7 @@ onMounted(fetchData)
   min-width: 0;
 }
 
-/* ==========================================================================
- * 段卡片(五段式 + 变量)
- * ========================================================================== */
+/* 卡片 */
 .section {
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
@@ -400,7 +350,7 @@ onMounted(fetchData)
 
 .section:hover {
   border-color: var(--gray-200);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 
 .section-title {
@@ -410,7 +360,7 @@ onMounted(fetchData)
   font-size: 16px;
   font-weight: 600;
   color: var(--color-text);
-  margin: 0 0 8px;
+  margin: 0 0 12px;
 }
 
 .section-icon {
@@ -418,38 +368,16 @@ onMounted(fetchData)
   flex-shrink: 0;
 }
 
-.section-note {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-  margin: 0 0 12px;
-  padding-left: 26px; /* 与图标对齐 */
-}
-
 .section-body {
   background: var(--gray-10);
   border: 1px solid var(--gray-100);
   border-radius: 6px;
-  padding: 16px;
-  margin-top: 4px;
+  padding: 20px 24px;
 }
 
-.section-text {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--color-text);
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
+.section--preview {
+  border-left: 4px solid var(--main-color);
 }
-
-/* 段卡左侧 4px 语义色条,五段差异化(role/goal/input/output/example)
-   info=稳定身份 / accent=目标强调 / warning=需填写 / main=主操作 / success=完成参考 */
-.section--role { border-left: 4px solid var(--color-info-500); }
-.section--goal { border-left: 4px solid var(--color-accent-500); }
-.section--input { border-left: 4px solid var(--color-warning-500); }
-.section--output { border-left: 4px solid var(--main-color); }
-.section--example { border-left: 4px solid var(--color-success-500); }
 
 .section--vars {
   border-left: 4px solid var(--main-500);
@@ -467,9 +395,117 @@ onMounted(fetchData)
   font-weight: 500;
 }
 
-/* ==========================================================================
- * 变量列表
- * ========================================================================== */
+.preview-empty {
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-size: 13px;
+  padding: 24px 0;
+}
+
+/* Markdown 渲染：与编辑器/TemplateFill/PlaybookRun 对齐 */
+.preview-md {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--color-text);
+}
+
+.preview-md :deep(h1) { font-size: 20px; }
+.preview-md :deep(h2) {
+  font-size: 17px;
+  padding-left: 10px;
+  border-left: 3px solid var(--main-color);
+  background: linear-gradient(90deg, var(--main-10) 0%, transparent 70%);
+  border-radius: 2px;
+}
+.preview-md :deep(h3) { font-size: 15px; }
+.preview-md :deep(h1),
+.preview-md :deep(h2),
+.preview-md :deep(h3) {
+  margin: 18px 0 8px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+}
+.preview-md :deep(h1:first-child),
+.preview-md :deep(h2:first-child),
+.preview-md :deep(h3:first-child) {
+  margin-top: 0;
+}
+.preview-md :deep(p) { margin: 0 0 12px; }
+.preview-md :deep(p:last-child) { margin-bottom: 0; }
+.preview-md :deep(hr) {
+  border: none;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--gray-200), transparent);
+  margin: 16px 0;
+}
+.preview-md :deep(ul),
+.preview-md :deep(ol) { margin: 8px 0 12px; padding-left: 24px; }
+.preview-md :deep(li) { margin: 4px 0; }
+.preview-md :deep(li::marker) { color: var(--main-color); }
+.preview-md :deep(strong) { font-weight: 600; }
+.preview-md :deep(em) { color: var(--color-text-secondary); font-style: italic; }
+.preview-md :deep(code) {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  padding: 1px 6px;
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  border-radius: 4px;
+  color: var(--main-700);
+}
+.preview-md :deep(pre) {
+  margin: 8px 0 12px;
+  padding: 12px 14px;
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  border-radius: 6px;
+  overflow-x: auto;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+.preview-md :deep(pre code) {
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+.preview-md :deep(a) {
+  color: var(--main-color);
+  text-decoration: none;
+  border-bottom: 1px dashed currentColor;
+}
+.preview-md :deep(a:hover) {
+  color: var(--main-700);
+  border-bottom-style: solid;
+}
+.preview-md :deep(blockquote) {
+  margin: 8px 0 12px;
+  padding: 6px 12px;
+  background: var(--gray-0);
+  border-left: 3px solid var(--gray-300);
+  color: var(--color-text-secondary);
+  border-radius: 0 4px 4px 0;
+}
+
+/* {{变量}} 高亮：v-html 注入的 DOM 不在 Vue scoped 子树里, 用 :deep 才生效 */
+.preview-md :deep(.md-var-chip) {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  margin: 0 2px;
+  background: var(--color-warning-50);
+  border: 1px solid var(--color-warning-200);
+  color: var(--color-warning-900);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: default;
+  white-space: nowrap;
+}
+
+/* 变量提示列表 */
 .var-list {
   list-style: none;
   margin: 0;
@@ -494,9 +530,13 @@ onMounted(fetchData)
 }
 
 .var-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-text);
+  background: var(--gray-0);
+  border: 1px solid var(--gray-150);
+  padding: 1px 8px;
+  border-radius: 4px;
   font-family: var(--font-mono);
 }
 
@@ -523,9 +563,6 @@ onMounted(fetchData)
   font-style: italic;
 }
 
-/* ==========================================================================
- * 底部 footer
- * ========================================================================== */
 .page-footer {
   display: flex;
   justify-content: center;
@@ -534,9 +571,6 @@ onMounted(fetchData)
   border-top: 1px solid var(--gray-100);
 }
 
-/* ==========================================================================
- * 响应式
- * ========================================================================== */
 @media (max-width: 768px) {
   .page-content {
     padding: 16px 0;
@@ -552,9 +586,6 @@ onMounted(fetchData)
     gap: 8px;
   }
   .page-bar__sub--detail {
-    padding: 0 16px;
-  }
-  .hero-tags {
     padding: 0 16px;
   }
   .section {

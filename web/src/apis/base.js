@@ -187,7 +187,7 @@ export function apiAdminGet(path, params = {}, responseType = 'json') {
 
 export function apiSuperAdminGet(path, params = {}, responseType = 'json') {
   checkSuperAdminPermission()
-  return apiGet(path, params, true, responseType)
+  return apiGet(`/admin${path}`, params, true, responseType)
 }
 
 // ---------------------------------------------------------------------------
@@ -213,7 +213,7 @@ export function apiAdminPost(path, data = {}, options = {}, responseType = 'json
 
 export function apiSuperAdminPost(path, data = {}, options = {}, responseType = 'json') {
   checkSuperAdminPermission()
-  return apiPost(path, data, options, true, responseType)
+  return apiPost(`/admin${path}`, data, options, true, responseType)
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +239,7 @@ export function apiAdminPut(path, data = {}, options = {}, responseType = 'json'
 
 export function apiSuperAdminPut(path, data = {}, options = {}, responseType = 'json') {
   checkSuperAdminPermission()
-  return apiPut(path, data, options, true, responseType)
+  return apiPut(`/admin${path}`, data, options, true, responseType)
 }
 
 // ---------------------------------------------------------------------------
@@ -256,5 +256,5 @@ export function apiAdminDelete(path, options = {}) {
 
 export function apiSuperAdminDelete(path, options = {}) {
   checkSuperAdminPermission()
-  return apiDelete(path, options, true)
+  return apiDelete(`/admin${path}`, options, true)
 }

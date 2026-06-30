@@ -71,11 +71,7 @@ async def create_template(
     template = await service.create_template(
         title=body.title,
         description=body.description,
-        role=body.role,
-        goal=body.goal,
-        input=body.input,
-        output=body.output,
-        example=body.example,
+        content=body.content,
         variable_hints=body.variable_hints,
         tag_ids=body.tag_ids,
         status=body.status,

@@ -117,3 +117,48 @@ class FillDataResponse(BaseModel):
 class VariableExtractResponse(BaseModel):
     """变量提取结果。"""
     variables: list[str]
+
+
+# ── 模板使用记录 ──────────────────────────────────────────────────────────
+
+
+class TemplateRunCreateRequest(BaseModel):
+    """保存一次模板使用的请求体."""
+    template_id: int
+    title: str | None = Field(default=None, max_length=200)
+    generated_prompt: str
+    form_values: dict[str, str] = Field(default_factory=dict)
+    ai_result: str | None = Field(default=None, description="AI 平台返回的结果")
+
+
+class TemplateRunSummary(BaseModel):
+    """列表项 — 不含详细内容."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    template_id: int
+    template_title: str
+    title: str | None = None
+    created_at: datetime
+    has_prompt: bool = False
+    has_result: bool = False
+
+
+class TemplateRunDetail(BaseModel):
+    """详情 — 含生成的 prompt 和变量值."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    template_id: int
+    template_title: str
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    generated_prompt: str | None = None
+    form_values: dict[str, str] = Field(default_factory=dict)
+    ai_result: str | None = None
+
+
+class TemplateRunListResponse(BaseModel):
+    items: list[TemplateRunSummary]
+    total: int

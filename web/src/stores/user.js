@@ -29,6 +29,13 @@ export const useUserStore = defineStore('user', {
     logout() {
       this.user = null
       this.token = null
+      // 清除当前用户的草稿/表单持久化数据，避免切换账号后残留
+      const keysToRemove = []
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i)
+        if (k && k.startsWith('sparklab:')) keysToRemove.push(k)
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k))
     }
   },
   persist: {

@@ -285,47 +285,49 @@ onMounted(() => {
       </div>
 
       <!-- 模板列表 -->
-      <a-spin :spinning="loading">
-        <ul v-if="items.length" class="template-list">
-          <li
-            v-for="item in items"
-            :key="item.id"
-            class="template-row"
-            tabindex="0"
-            @click="goDetail(item.id)"
-            @keydown.enter="goDetail(item.id)"
-          >
-            <h3 class="row-title">{{ item.title }}</h3>
-            <div class="row-tags">
-              <template v-if="item.tags?.length">
-                <span v-for="t in item.tags.slice(0, 4)" :key="t.id" class="card-tag">{{ t.name }}</span>
-                <span v-if="item.tags.length > 4" class="tag-more">+{{ item.tags.length - 4 }}</span>
-              </template>
-              <span v-else class="row-tags-empty">—</span>
-            </div>
-            <div class="row-usage">
-              <Clock :size="13" />
-              <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
-            </div>
-          </li>
-        </ul>
+      <div class="loading-wrap" :class="{ 'loading-wrap--active': loading }">
+        <a-spin :spinning="loading">
+          <ul v-if="items.length" class="template-list">
+            <li
+              v-for="item in items"
+              :key="item.id"
+              class="template-row"
+              tabindex="0"
+              @click="goDetail(item.id)"
+              @keydown.enter="goDetail(item.id)"
+            >
+              <h3 class="row-title">{{ item.title }}</h3>
+              <div class="row-tags">
+                <template v-if="item.tags?.length">
+                  <span v-for="t in item.tags.slice(0, 4)" :key="t.id" class="card-tag">{{ t.name }}</span>
+                  <span v-if="item.tags.length > 4" class="tag-more">+{{ item.tags.length - 4 }}</span>
+                </template>
+                <span v-else class="row-tags-empty">—</span>
+              </div>
+              <div class="row-usage">
+                <Clock :size="13" />
+                <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
+              </div>
+            </li>
+          </ul>
 
-        <!-- 空态:替换 a-empty 为带图标的 .empty-state -->
-        <div v-else-if="!loading" class="empty-state">
-          <div class="empty-state__icon">
-            <FileSearch :size="28" />
+          <!-- 空态:替换 a-empty 为带图标的 .empty-state -->
+          <div v-else-if="!loading" class="empty-state">
+            <div class="empty-state__icon">
+              <FileSearch :size="28" />
+            </div>
+            <h3 class="empty-state__title">
+              {{ hasActiveFilter ? '没有找到匹配的模板' : '暂无可用模板' }}
+            </h3>
+            <p class="empty-state__desc">
+              {{ hasActiveFilter ? '试试调整筛选条件,或清除筛选后查看全部模板' : '管理员发布后,模板会出现在这里' }}
+            </p>
+            <a-button v-if="hasActiveFilter" type="primary" @click="clearAllFilters">
+              清除筛选
+            </a-button>
           </div>
-          <h3 class="empty-state__title">
-            {{ hasActiveFilter ? '没有找到匹配的模板' : '暂无可用模板' }}
-          </h3>
-          <p class="empty-state__desc">
-            {{ hasActiveFilter ? '试试调整筛选条件,或清除筛选后查看全部模板' : '管理员发布后,模板会出现在这里' }}
-          </p>
-          <a-button v-if="hasActiveFilter" type="primary" @click="clearAllFilters">
-            清除筛选
-          </a-button>
-        </div>
-      </a-spin>
+        </a-spin>
+      </div>
 
       <!-- 分页 -->
       <div v-if="total > pageSize" class="pagination-wrap">
@@ -343,175 +345,16 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* 页面顶部 .page-bar__title 用全局 24px(已对齐 design.md),不再局部覆盖 */
+/* toolbar / filter / result-summary 样式已移至 base.css, 全局共用 */
 
-/* 紧凑工具栏：覆盖全局 .toolbar-card 的 padding/gap，控件高度统一 28px */
-.toolbar-card--compact {
-  padding: 8px 12px;
-  gap: 8px;
-  border-radius: 8px;
+.loading-wrap {
+  min-height: 120px;
 }
 
-/* 普通 select / button: 直接给最外层圆角 + 28px 高 */
-.toolbar-card--compact :deep(.ant-select-sm .ant-select-selector),
-.toolbar-card--compact :deep(.ant-btn-sm:not(.ant-input-search-button)) {
-  height: 28px;
-  border-radius: 6px;
-}
-
-/* a-input-search 的 DOM 是 group-wrapper > [affix-wrapper, group-addon>button]:
- * 只给最外层 .ant-input-group-wrapper 设圆角,内部 affix-wrapper / input / button
- * 都保持矩形,避免内外圆角不一致或底部边框被相邻 addon 截断。 */
-.toolbar-card--compact :deep(.ant-input-search) {
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.toolbar-card--compact :deep(.ant-input-search .ant-input-affix-wrapper),
-.toolbar-card--compact :deep(.ant-input-search .ant-input-search-button) {
-  height: 28px;
-  border-radius: 0;
-}
-
-.search-input {
-  flex: 1;
-  max-width: 420px;
-  min-width: 180px;
-}
-
-/* 自定义紧凑按钮：跟 Ant 小号控件高度对齐 */
-.toolbar-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding: 0 10px;
-  background: var(--gray-0);
-  border: 1px solid var(--gray-200);
-  border-radius: 6px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.toolbar-btn:hover {
-  color: var(--color-text);
-  border-color: var(--gray-300);
-}
-
-.toolbar-btn--active {
-  color: var(--main-700);
-  border-color: var(--main-color);
-  background: var(--main-10);
-}
-
-.toolbar-btn--ghost {
-  border-color: transparent;
-  background: transparent;
-}
-
-.toolbar-btn--ghost:hover {
-  background: var(--gray-25);
-  border-color: transparent;
-}
-
-.toolbar-badge {
-  display: inline-flex;
-  align-items: center;
+.loading-wrap--active {
+  display: flex;
   justify-content: center;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  margin-left: 2px;
-  background: var(--main-color);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 999px;
-  line-height: 1;
-}
-
-.filter-panel {
-  background: var(--gray-0);
-  border: 1px solid var(--gray-150);
-  border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 12px;
-}
-
-.filter-panel--compact .filter-group {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 8px 0;
-  border-bottom: 1px dashed var(--gray-100);
-}
-
-.filter-panel--compact .filter-group:first-child {
-  padding-top: 0;
-}
-
-.filter-panel--compact .filter-group:last-child {
-  padding-bottom: 0;
-  border-bottom: none;
-}
-
-.filter-label {
-  flex-shrink: 0;
-  width: 72px;
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  font-weight: 500;
-  padding-top: 4px;
-}
-
-.filter-tags {
-  flex: 1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-/* 紧凑模式下的 tag-chip 缩小一档 */
-.filter-panel--compact .tag-chip {
-  padding: 2px 10px;
-  font-size: 12px;
-}
-
-.selected-tags {
-  display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.selected-label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin-right: 4px;
-}
-
-.selected-tags .tag-chip {
-  gap: 6px;
-  padding: 4px 8px 4px 12px;
-}
-
-.result-summary {
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  margin: 4px 0 16px;
-}
-
-.result-summary strong {
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-.filter-hint {
-  color: var(--main-600);
-  margin-left: 4px;
 }
 
 .template-list {

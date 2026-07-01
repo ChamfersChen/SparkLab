@@ -213,3 +213,155 @@ class PlaybookRepository:
 
 # 用来在 update() 里区分「没传 steps/tag_ids」(sentinel) vs 「传了空列表」(要清空)
 _SENTINEL = object()
+
+
+# ===========================================================================
+# 工作流运行记录 (个人中心 / 我的运行记录)
+# ===========================================================================
+
+from sparklab.models.playbook import PlaybookRun, PlaybookRunStep  # noqa: E402  (同包,放这里便于读)
+
+
+class PlaybookRunRepository:
+    """工作流运行记录的 DB 访问层.
+
+    list_by_user / get_by_id_for_user / delete 都按 user_id 隔离, 越权返回 None
+    (路由层转为 404).
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create_with_steps(
+        self,
+        *,
+        user_id: int,
+        playbook_id: int,
+        title: str | None,
+        steps_data: list[dict],
+        final_result: str | None = None,
+        filled_prompts: list[str | None] | None = None,
+    ) -> PlaybookRun:
+        """插 playbook_runs + 批量插 playbook_run_steps, 单事务.
+
+        steps_data 元素: {step_order, step_name, user_output, form_values, filled_prompt}
+        - form_values 是 dict, 这里 json.dumps 存盘
+        - user_output 为空字符串/None 时存 NULL
+        - filled_prompts (可选) 与 steps_data 一一对应, server 现算的补充后 prompt
+        - final_result (可选) 用户在三栏右栏填的"最终结果"
+        """
+        run = PlaybookRun(
+            user_id=user_id,
+            playbook_id=playbook_id,
+            title=title,
+            final_result=final_result,
+        )
+        self.db.add(run)
+        await self.db.flush()
+
+        for idx, s in enumerate(steps_data):
+            fv = s.get("form_values") or {}
+            filled = None
+            if filled_prompts is not None and idx < len(filled_prompts):
+                filled = filled_prompts[idx]
+            self.db.add(
+                PlaybookRunStep(
+                    run_id=run.id,
+                    step_order=int(s["step_order"]),
+                    step_name=str(s.get("step_name") or ""),
+                    user_output=(s.get("user_output") or None),
+                    form_values_json=(
+                        json.dumps(fv, ensure_ascii=False) if fv else None
+                    ),
+                    filled_prompt=filled,
+                )
+            )
+        await self.db.flush()
+        return run
+
+    async def list_by_user(
+        self,
+        user_id: int,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[PlaybookRun], int]:
+        """按 created_at DESC 返回当前用户的运行记录 + total."""
+        from sqlalchemy import func as sa_func
+
+        count_q = select(sa_func.count(PlaybookRun.id)).where(PlaybookRun.user_id == user_id)
+        total_result = await self.db.execute(count_q)
+        total = total_result.scalar() or 0
+
+        q = (
+            select(PlaybookRun)
+            .where(PlaybookRun.user_id == user_id)
+            .options(selectinload(PlaybookRun.steps))
+            .order_by(PlaybookRun.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.db.execute(q)
+        return list(result.scalars().all()), total
+
+    async def get_by_id_for_user(
+        self,
+        run_id: int,
+        user_id: int,
+    ) -> PlaybookRun | None:
+        """按 id 查 + 校验归属. 越权 (run 不属于该 user) → None."""
+        run = await self.db.get(PlaybookRun, run_id)
+        if run is None:
+            return None
+        if run.user_id != user_id:
+            return None
+        # 显式 selectinload steps (get 不会自动 eager load relationship)
+        result = await self.db.execute(
+            select(PlaybookRun)
+            .where(PlaybookRun.id == run_id)
+            .options(selectinload(PlaybookRun.steps))
+        )
+        return result.scalar_one_or_none()
+
+    async def delete(self, run_id: int, user_id: int) -> bool:
+        """物理删除 (CASCADE 删 steps). 越权 → False."""
+        run = await self.db.get(PlaybookRun, run_id)
+        if run is None or run.user_id != user_id:
+            return False
+        await self.db.delete(run)
+        await self.db.flush()
+        return True
+
+
+def summarize_run(run: PlaybookRun) -> dict:
+    """把 PlaybookRun 拆成 summary dict (前端列表用)."""
+    steps = list(run.steps or [])
+    return {
+        "id": run.id,
+        "playbook_id": run.playbook_id,
+        "playbook_title": run.playbook.title if run.playbook else "",
+        "title": run.title,
+        "created_at": run.created_at,
+        "updated_at": run.updated_at,
+        "step_count": len(steps),
+        "filled_step_count": sum(1 for s in steps if (s.user_output or "").strip()),
+        "has_final_result": bool((run.final_result or "").strip()),
+    }
+
+
+def detail_run(run: PlaybookRun) -> dict:
+    """把 PlaybookRun 拆成 detail dict (含 steps 详情, 前端详情/创建返回用)."""
+    steps = list(run.steps or [])
+    return {
+        "id": run.id,
+        "playbook_id": run.playbook_id,
+        "playbook_title": run.playbook.title if run.playbook else "",
+        "title": run.title,
+        "created_at": run.created_at,
+        "updated_at": run.updated_at,
+        "step_count": len(steps),
+        "filled_step_count": sum(1 for s in steps if (s.user_output or "").strip()),
+        "has_final_result": bool((run.final_result or "").strip()),
+        "final_result": run.final_result,
+        "steps": steps,
+    }

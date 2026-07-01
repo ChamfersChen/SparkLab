@@ -10,7 +10,7 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5173,
+    port: 5123,
     host: '0.0.0.0',
     proxy: {
       // 开发期把 /api/* 反代到后端容器，浏览器视角下是同源，规避 CORS

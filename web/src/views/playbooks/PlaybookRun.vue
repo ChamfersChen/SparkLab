@@ -1,20 +1,17 @@
 <script setup>
 /**
- * 工作流运行页（用户端）。
+ * 工作流运行页（用户端，v4 三栏布局）。
  *
  * 流程：
  *   1. 进入页面：拉取 playbook 详情 + 顶部 +1 use_count
- *   2. 每步循环：
- *      - 顶部可折叠的"上一步 AI 结果"粘回区(仅当本步 content 引用了 {{prev_output}})
- *      - 本步变量填写区(自动从 content 提取 {{var}},排除 {{prev_output}})
- *      - 底部"复制本步 prompt / 打开 AI 平台"按钮 → 用户去第三方 AI 平台提问
- *      - 粘贴 AI 结果到粘回区 → 下一步继续
- *   3. 最后一步:调用 /run 返回拼接后的完整 prompt,Markdown 渲染 + 复制 + AI 平台跳转
- *   4. 草稿持久化：localStorage 存 formValues (workflow-level + step-level),**不存 prev_output**(私密)
+ *   2. 三栏布局:
+ *      - 左: 步骤导航 (切 step)
+ *      - 中: 当前 step 填表 (最大) — 上一步 AI 粘回 / 变量填写 / 预览 / 复制本步 prompt / AI 平台 / 上下步
+ *      - 右: 最终结果填写 — 始终可见, Markdown textarea, "保存到我的运行" inline
+ *   3. localStorage 持久化: workflowFormValues + stepFormValues + 摘要右栏
+ *      (summaryFinalContent / summaryTitle / summaryCollapsed)
  *
- * 与 TemplateFill 一致的设计:
- *   - 28px 紧凑工具栏
- *   - markdown-it 渲染 + 复制/平台跳转
+ * 设计: 28px 紧凑风格, 弹层/抽屉不再使用; 右栏填的内容不跳路由保存.
  */
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -24,14 +21,16 @@ import {
   ArrowRight,
   Check,
   ChevronLeft,
+  ChevronRight,
   Copy,
   ExternalLink,
   RefreshCcw,
   Sparkles,
   Wand2,
+  X,
 } from 'lucide-vue-next'
-import MarkdownIt from 'markdown-it'
-import { getPlaybook, incrementUseCount, runPlaybook } from '@/apis/playbook_api'
+import { getPlaybook, incrementUseCount } from '@/apis/playbook_api'
+import { createPlaybookRun } from '@/apis/playbook_runs_api'
 
 const route = useRoute()
 const router = useRouter()
@@ -45,37 +44,19 @@ const PLATFORMS = [
 
 const loading = ref(false)
 const playbook = ref(null)
-// workflow-level form values
 const workflowFormValues = ref({})
-// per-step form values, keyed by step_order
 const stepFormValues = ref({})
-// 渲染好的每步 prompt(用于本地预览,不持久化)
 const stepFilledPrompts = ref({})
-// 每步用户粘回的 AI 结果,keyed by step_order,**不持久化**
 const stepPrevOutputs = ref({})
 
+// v4: 右栏"最终结果" — 始终可见
+const summaryFinalContent = ref('')
+const summaryTitle = ref('')
+const summaryCollapsed = ref(false)
+const summarySaved = ref(false)        // 短暂显示"✓ 已保存"
+const saving = ref(false)
+
 const currentStepIndex = ref(0)
-const running = ref(false)
-
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-}).use((mdInstance) => {
-  const defaultLinkOpen =
-    mdInstance.renderer.rules.link_open ||
-    function (tokens, idx, options, _env, self) {
-      return self.renderToken(tokens, idx, options)
-    }
-  mdInstance.renderer.link_open = function (tokens, idx, options, env, self) {
-    const t = tokens[idx]
-    t.attrSet('target', '_blank')
-    t.attrSet('rel', 'noopener noreferrer')
-    return defaultLinkOpen(tokens, idx, options, env, self)
-  }
-})
-
-const renderedFinal = ref('')
 
 function draftKey(id) {
   return `sparklab:playbook-draft:${id}`
@@ -90,6 +71,10 @@ function saveDraft() {
         workflowFormValues: { ...workflowFormValues.value },
         stepFormValues: { ...stepFormValues.value },
         currentStepIndex: currentStepIndex.value,
+        // v4: 摘要右栏内容持久化
+        summaryFinalContent: summaryFinalContent.value,
+        summaryTitle: summaryTitle.value,
+        summaryCollapsed: summaryCollapsed.value,
         savedAt: Date.now(),
       }),
     )
@@ -111,6 +96,10 @@ function loadDraft() {
       }
     }
     if (typeof d.currentStepIndex === 'number') currentStepIndex.value = d.currentStepIndex
+    // v4: 还原右栏
+    if (typeof d.summaryFinalContent === 'string') summaryFinalContent.value = d.summaryFinalContent
+    if (typeof d.summaryTitle === 'string') summaryTitle.value = d.summaryTitle
+    if (typeof d.summaryCollapsed === 'boolean') summaryCollapsed.value = d.summaryCollapsed
   } catch {
     // ignore
   }
@@ -123,7 +112,10 @@ function clearDraft() {
   stepFilledPrompts.value = {}
   stepPrevOutputs.value = {}
   currentStepIndex.value = 0
-  renderedFinal.value = ''
+  summaryFinalContent.value = ''
+  summaryTitle.value = ''
+  summaryCollapsed.value = false
+  summarySaved.value = false
   localStorage.removeItem(draftKey(playbook.value.id))
   message.success('草稿已清除')
 }
@@ -148,22 +140,19 @@ function refPrevOutput(text) {
   return /\{\{\s*prev_output\s*\}\}/.test(text || '')
 }
 
-/** 在本地用 prev_output (若有) + form_values 替换 {{var}}。返回 (filled, prev_output_injected) */
 function fillLocal(text, formValues, prevOutput) {
-  if (!text) return { filled: '', injected: false }
+  if (!text) return ''
   let t = text
-  let injected = false
   if (prevOutput && /\{\{\s*prev_output\s*\}\}/.test(t)) {
     t = t.replace(/\{\{\s*prev_output\s*\}\}/g, prevOutput)
-    injected = true
   }
   t = (t || '').replace(/\{\{(.*?)\}\}/g, (m, k) => {
     const key = k.trim()
-    if (key === 'prev_output') return m  // 已被替换,残留的当字面量
+    if (key === 'prev_output') return m
     const v = formValues[key]
     return v && String(v).trim() ? String(v).trim() : m
   })
-  return { filled: t, injected }
+  return t
 }
 
 async function fetchData() {
@@ -171,12 +160,10 @@ async function fetchData() {
   try {
     const p = await getPlaybook(route.params.id)
     playbook.value = p
-    // 初始化 workflowFormValues 的 key
     const wfVars = extractVariables(p.content || '')
     for (const v of wfVars) {
       if (!(v in workflowFormValues.value)) workflowFormValues.value[v] = ''
     }
-    // 初始化每步 form values key(排除 prev_output)
     for (const step of p.steps) {
       const stepVars = extractVariables(step.content || '')
       if (!stepFormValues.value[step.step_order]) stepFormValues.value[step.step_order] = {}
@@ -187,9 +174,6 @@ async function fetchData() {
       }
     }
     loadDraft()
-    incrementUseCount(p.id).catch(() => {
-      // 静默失败,不影响使用
-    })
   } catch (e) {
     if (e?.response?.status !== 401) {
       message.error('工作流加载失败')
@@ -211,7 +195,6 @@ const currentStepMissingCount = computed(() => {
   ).length
 })
 
-// prev_output 仅当 (a) 当前步引用了 {{prev_output}} (b) 不是首步 才渲染粘回区
 const showPrevOutputSection = computed(() => {
   if (!currentStep.value) return false
   if (currentStepIndex.value === 0) return false
@@ -225,17 +208,24 @@ const workflowMissingCount = computed(() => {
   ).length
 })
 
-/** 在本地生成本步渲染结果(用于顶部折叠预览 + 复制) */
 function generateCurrentStep() {
   if (!currentStep.value) return
   const so = currentStep.value.step_order
-  const { filled } = fillLocal(
+  const filled = fillLocal(
     currentStep.value.content || '',
     stepFormValues.value[so] || {},
     stepPrevOutputs.value[so] || null,
   )
   stepFilledPrompts.value[so] = filled
   message.success('已生成本步提示词预览')
+  saveDraft()
+}
+
+function clearStepPreview(so) {
+  const order = typeof so === 'number' ? so : currentStep.value?.step_order
+  if (order === undefined || order === null) return
+  delete stepFilledPrompts.value[order]
+  stepFilledPrompts.value = { ...stepFilledPrompts.value }
   saveDraft()
 }
 
@@ -258,18 +248,15 @@ function setPrevOutputForCurrent(text) {
   stepPrevOutputs.value[currentStep.value.step_order] = text
 }
 
-/** 当前步渲染(用户点击"复制本步 prompt"时调用,确保本地有最新值) */
 function currentStepRendered() {
   if (!currentStep.value) return ''
-  // 优先用已生成的预览(保证用户视觉与复制一致);否则临时渲染
   const so = currentStep.value.step_order
   if (stepFilledPrompts.value[so]) return stepFilledPrompts.value[so]
-  const { filled } = fillLocal(
+  return fillLocal(
     currentStep.value.content || '',
     stepFormValues.value[so] || {},
     stepPrevOutputs.value[so] || null,
   )
-  return filled
 }
 
 async function copyCurrentStep() {
@@ -301,72 +288,45 @@ async function openPlatformForCurrent(url) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-async function generateFinal() {
+// v4: 保存到我的运行 (inline 在右栏底部, 不跳路由)
+// 成功时短暂显示"✓ 已保存"提示, 用户继续在三栏页内编辑
+async function confirmSaveSummary() {
   if (!playbook.value) return
-  // 校验: 含 prev_output 的步必须有粘回
-  for (const s of playbook.value.steps) {
-    if (refPrevOutput(s.content) && !(stepPrevOutputs.value[s.step_order] || '').trim()) {
-      message.warning(`第 ${s.step_order + 1} 步「${s.name}」需要「上一步结果」,请先粘回`)
-      return
+  const hasStepOutput = (playbook.value.steps || []).some(
+    (s) => (stepPrevOutputs.value[s.step_order] || '').trim(),
+  )
+  const hasFinal = !!summaryFinalContent.value.trim()
+  if (!hasStepOutput && !hasFinal) {
+    message.warning('请先粘回至少 1 个 step 的 AI 结果,或在右栏填写最终结果')
+    return
+  }
+  saving.value = true
+  summarySaved.value = false
+  try {
+    const title =
+      summaryTitle.value.trim() ||
+      `${playbook.value.title} · ${new Date().toLocaleString('zh-CN', { hour12: false })}`
+    const payload = {
+      playbook_id: playbook.value.id,
+      title,
+      final_result: summaryFinalContent.value,
+      steps: (playbook.value.steps || []).map((s) => ({
+        step_order: s.step_order,
+        step_name: s.name,
+        user_output: stepPrevOutputs.value[s.step_order] || null,
+        form_values: stepFormValues.value[s.step_order] || {},
+      })),
     }
-  }
-  running.value = true
-  try {
-    const step_outputs = playbook.value.steps.map((s) => ({
-      step_order: s.step_order,
-      form_values: { ...(stepFormValues.value[s.step_order] || {}) },
-      prev_output: stepPrevOutputs.value[s.step_order] || null,
-    }))
-    const res = await runPlaybook(playbook.value.id, {
-      form_values: { ...workflowFormValues.value },
-      step_outputs,
-    })
-    renderedFinal.value = md.render(res.final_prompt)
-    message.success('已生成最终提示词')
+    await createPlaybookRun(payload)
+    incrementUseCount(playbook.value.id).catch(() => {})
+    summarySaved.value = true
+    message.success('已保存到「我的运行」')
+    setTimeout(() => { summarySaved.value = false }, 2500)
   } catch (e) {
-    message.error(e?.response?.data?.detail || e?.message || '生成失败')
+    message.error(e?.response?.data?.detail || e?.message || '保存失败')
   } finally {
-    running.value = false
+    saving.value = false
   }
-}
-
-async function copyFinal() {
-  if (!playbook.value) return
-  try {
-    const step_outputs = playbook.value.steps.map((s) => ({
-      step_order: s.step_order,
-      form_values: { ...(stepFormValues.value[s.step_order] || {}) },
-      prev_output: stepPrevOutputs.value[s.step_order] || null,
-    }))
-    const res = await runPlaybook(playbook.value.id, {
-      form_values: { ...workflowFormValues.value },
-      step_outputs,
-    })
-    await navigator.clipboard.writeText(res.final_prompt)
-    message.success('已复制到剪贴板')
-  } catch {
-    message.error('复制失败,请手动复制')
-  }
-}
-
-async function openPlatformFinal(url) {
-  if (!playbook.value) return
-  try {
-    const step_outputs = playbook.value.steps.map((s) => ({
-      step_order: s.step_order,
-      form_values: { ...(stepFormValues.value[s.step_order] || {}) },
-      prev_output: stepPrevOutputs.value[s.step_order] || null,
-    }))
-    const res = await runPlaybook(playbook.value.id, {
-      form_values: { ...workflowFormValues.value },
-      step_outputs,
-    })
-    await navigator.clipboard.writeText(res.final_prompt)
-    message.success('提示词已复制,请在 AI 平台中粘贴')
-  } catch {
-    message.warning('请手动复制后再打开 AI 平台')
-  }
-  window.open(url, '_blank', 'noopener,noreferrer')
 }
 
 function goBack() {
@@ -398,7 +358,7 @@ onMounted(fetchData)
 
           <p v-if="playbook.description" class="page-bar__sub page-bar__sub--fill">{{ playbook.description }}</p>
 
-          <!-- 工作流级变量填写(若 playbook.content 有 {{var}}) -->
+          <!-- 工作流级参数(若 playbook.content 有 {{var}}) -->
           <section v-if="extractVariables(playbook.content || '').length" class="workflow-form card-block">
             <h3 class="workflow-form__title">工作流参数</h3>
             <div class="workflow-form__grid">
@@ -423,8 +383,9 @@ onMounted(fetchData)
             </div>
           </section>
 
+          <!-- 三栏布局: 步骤导航 | 当前 step | 最终结果 -->
           <div class="run-layout">
-            <!-- 左:步骤导航 -->
+            <!-- 左: 步骤导航 -->
             <aside class="step-nav">
               <div class="step-nav__title">步骤导航</div>
               <div
@@ -444,12 +405,27 @@ onMounted(fetchData)
                 </div>
                 <Check v-if="idx < currentStepIndex" :size="14" class="step-nav__check" />
               </div>
+
+              <!-- AI 平台快捷跳转 -->
+              <div class="step-nav__divider" />
+              <div class="step-nav__platform-title">AI 平台</div>
+              <div class="step-nav__platforms">
+                <button
+                  v-for="p in PLATFORMS"
+                  :key="p.name"
+                  type="button"
+                  class="platform-chip platform-chip--sidebar"
+                  @click="openPlatformForCurrent(p.url)"
+                >
+                  <span>{{ p.name }}</span>
+                  <ExternalLink :size="11" />
+                </button>
+              </div>
             </aside>
 
-            <!-- 右:主交互区 -->
-            <main class="run-main">
-              <!-- 当前步骤交互 -->
-              <section class="panel">
+            <!-- 中: 当前 step 面板(最大) -->
+            <main class="middle-pane">
+              <section class="panel panel--current-step">
                 <div class="panel-header">
                   <h2 class="panel-title">
                     <span class="panel-title-icon"><Wand2 :size="16" /></span>
@@ -517,8 +493,16 @@ onMounted(fetchData)
                     <p class="no-vars-desc">直接生成或跳到 AI 平台即可</p>
                   </div>
 
-                  <!-- 3) 本步 prompt 预览(若已生成) -->
+                  <!-- 3) 本步 prompt 预览(可关闭) -->
                   <div v-if="stepFilledPrompts[currentStep?.step_order]" class="current-preview">
+                    <button
+                      type="button"
+                      class="current-preview__close"
+                      title="清除本步预览"
+                      @click="clearStepPreview(currentStep.step_order)"
+                    >
+                      <X :size="14" />
+                    </button>
                     <div class="current-preview__title">本步 prompt 预览</div>
                     <pre class="current-preview__pre">{{ stepFilledPrompts[currentStep.step_order] }}</pre>
                   </div>
@@ -544,18 +528,6 @@ onMounted(fetchData)
                     <template #icon><Copy :size="14" /></template>
                     复制本步 prompt
                   </a-button>
-                  <div class="platform-group platform-group--inline">
-                    <button
-                      v-for="p in PLATFORMS"
-                      :key="p.name"
-                      type="button"
-                      class="platform-chip"
-                      @click="openPlatformForCurrent(p.url)"
-                    >
-                      <span>{{ p.name }}</span>
-                      <ExternalLink :size="11" />
-                    </button>
-                  </div>
                   <a-button
                     v-if="currentStepIndex < totalSteps - 1"
                     type="primary"
@@ -568,65 +540,90 @@ onMounted(fetchData)
                   <a-button
                     v-else
                     type="primary"
-                    :loading="running"
-                    @click="generateFinal"
+                    ghost
+                    @click="goToNext"
                   >
-                    查看最终结果
-                    <template #icon><Sparkles :size="14" /></template>
+                    重新走一次
+                    <template #icon><ArrowRight :size="14" /></template>
                   </a-button>
                 </div>
               </section>
+            </main>
 
-              <!-- 最终结果 -->
-              <section v-if="renderedFinal" class="panel panel--result">
+            <!-- 右: 最终结果填写(始终可见) -->
+            <aside class="summary-pane">
+              <section class="panel panel--summary">
                 <div class="panel-header">
                   <h2 class="panel-title">
                     <span class="panel-title-icon panel-title-icon--accent"><Sparkles :size="16" /></span>
-                    <span>最终提示词</span>
+                    <span>最终结果</span>
+                    <button
+                      type="button"
+                      class="panel-collapse-btn"
+                      :title="summaryCollapsed ? '展开' : '折叠'"
+                      @click="summaryCollapsed = !summaryCollapsed; saveDraft()"
+                    >
+                      <ChevronRight v-if="summaryCollapsed" :size="14" />
+                      <ChevronLeft v-else :size="14" />
+                    </button>
                   </h2>
-                  <div class="header-meta">
-                    <button
-                      type="button"
-                      class="header-action-btn"
-                      @click="copyFinal"
-                    >
-                      <Copy :size="14" />
-                      <span>复制</span>
-                    </button>
-                  </div>
                 </div>
 
-                <div class="panel-body panel-body--preview">
-                  <div class="preview-md" v-html="renderedFinal"></div>
-                </div>
+                <div v-show="!summaryCollapsed" class="panel-body panel-body--summary">
+                  <p class="summary-hint">
+                    走完工作流后, 把最终结论写在这里。<strong>支持 Markdown</strong>。保存时会与每步补充后的 prompt 一起存入个人中心。
+                  </p>
+                  <a-form layout="vertical">
+                    <a-form-item label="运行标题（可选, 留空自动生成）">
+                      <a-input
+                        v-model:value="summaryTitle"
+                        placeholder="例: 2026 春季产品定位"
+                        :maxlength="200"
+                        show-count
+                      />
+                    </a-form-item>
+                    <a-form-item label="最终结果（Markdown）">
+                      <a-textarea
+                        v-model:value="summaryFinalContent"
+                        :rows="18"
+                        :auto-size="{ minRows: 12, maxRows: 30 }"
+                        placeholder="把工作流跑完后的最终结论写在这里。例如:
 
-                <div class="panel-footer panel-footer--platforms">
-                  <span class="platform-label">在 AI 平台中打开</span>
-                  <div class="platform-group">
-                    <button
-                      v-for="p in PLATFORMS"
-                      :key="p.name"
-                      type="button"
-                      class="platform-chip"
-                      @click="openPlatformFinal(p.url)"
+# 产品定位
+- 目标人群: 25-35 岁都市女性
+- 核心卖点: 极致便携 + 时尚外观
+- 价格区间: 299-499 元
+..."
+                      />
+                    </a-form-item>
+                  </a-form>
+                  <div class="summary-actions">
+                    <a-button
+                      type="primary"
+                      size="middle"
+                      :loading="saving"
+                      @click="confirmSaveSummary"
                     >
-                      <span>{{ p.name }}</span>
-                      <ExternalLink :size="11" />
-                    </button>
+                      保存到我的运行
+                    </a-button>
+                    <span v-if="summarySaved" class="summary-saved-tag">✓ 已保存</span>
+                    <span v-else class="summary-saved-tip">
+                      可随时保存 — 不会打断你的编辑
+                    </span>
                   </div>
                 </div>
               </section>
+            </aside>
+          </div>
 
-              <!-- 底部工具栏 -->
-              <div class="run-toolbar">
-                <a-tooltip title="清除当前已填写的全部内容和已生成的最终结果">
-                  <a-button size="small" @click="clearDraft">
-                    <template #icon><RefreshCcw :size="12" /></template>
-                    清除草稿
-                  </a-button>
-                </a-tooltip>
-              </div>
-            </main>
+          <!-- 底部工具栏 -->
+          <div class="run-toolbar">
+            <a-tooltip title="清除当前已填写的全部内容和右栏最终结果">
+              <a-button size="small" @click="clearDraft">
+                <template #icon><RefreshCcw :size="12" /></template>
+                清除草稿
+              </a-button>
+            </a-tooltip>
           </div>
         </template>
       </a-spin>
@@ -736,19 +733,35 @@ onMounted(fetchData)
   color: var(--color-warning-700);
 }
 
+/* v4: 三栏布局 (步骤导航 / 当前 step / 最终结果) */
 .run-layout {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1.4fr) minmax(0, 1fr);
   gap: 16px;
   padding: 0 24px 24px;
-  max-width: 1400px;
+  max-width: 1600px;
   width: 100%;
   margin: 0 auto;
 }
 
-/* 左侧步骤导航 */
+@media (max-width: 1280px) {
+  .run-layout {
+    grid-template-columns: 200px minmax(0, 1.2fr) minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1024px) {
+  .run-layout {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+  .summary-pane {
+    grid-column: 2;
+  }
+}
+
+/* 左侧步骤导航 (复用 v3) */
 .step-nav {
   display: flex;
   flex-direction: column;
@@ -849,16 +862,49 @@ onMounted(fetchData)
   margin-top: 4px;
 }
 
-/* 右侧主区域 */
-.run-main {
+.step-nav__divider {
+  height: 1px;
+  background: var(--gray-150);
+  margin: 4px 0;
+}
+
+.step-nav__platform-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  padding: 0 4px;
+}
+
+.step-nav__platforms {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 4px;
+}
+
+.platform-chip--sidebar {
+  width: 100%;
+  justify-content: center;
+}
+
+/* 中间栏 */
+.middle-pane {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
 }
 
+/* 右侧汇总栏 */
+.summary-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* panel 基础 (复用 v3) */
 .panel {
   display: flex;
   flex-direction: column;
@@ -894,6 +940,31 @@ onMounted(fetchData)
   font-weight: 600;
   color: var(--color-text);
   margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.panel-collapse-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: var(--gray-0);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.panel-collapse-btn:hover {
+  border-color: var(--main-color);
+  color: var(--main-color);
+  background: var(--main-10);
 }
 
 .panel-title-icon {
@@ -943,28 +1014,6 @@ onMounted(fetchData)
   color: var(--color-success-700);
 }
 
-.header-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 28px;
-  padding: 0 10px;
-  background: var(--gray-0);
-  border: 1px solid var(--gray-200);
-  border-radius: 6px;
-  color: var(--color-text);
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.header-action-btn:hover {
-  border-color: var(--main-color);
-  color: var(--main-color);
-  background: var(--main-10);
-}
-
 .panel-body {
   flex: 1 1 0;
   min-height: 0;
@@ -972,9 +1021,9 @@ onMounted(fetchData)
   overflow-y: auto;
 }
 
-.panel-body--preview {
-  padding: 0;
-  background: var(--gray-10);
+.panel-body--summary {
+  display: flex;
+  flex-direction: column;
 }
 
 /* 上一步 AI 结果粘回区 */
@@ -1068,13 +1117,6 @@ onMounted(fetchData)
   width: 100%;
 }
 
-.field-hint {
-  font-size: 12px;
-  color: var(--color-text-secondary);
-  margin: 6px 0 0;
-  line-height: 1.5;
-}
-
 .form-field--error .field-label {
   color: var(--color-error-700);
 }
@@ -1101,13 +1143,38 @@ onMounted(fetchData)
   margin: 0;
 }
 
-/* 本步 prompt 预览(粘回区下方) */
+/* 本步 prompt 预览(可关闭) */
 .current-preview {
+  position: relative;
   margin-top: 16px;
   padding: 12px 14px;
   background: var(--gray-10);
   border: 1px solid var(--gray-150);
   border-radius: 6px;
+}
+
+.current-preview__close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: var(--gray-0);
+  border: 1px solid var(--gray-200);
+  border-radius: 50%;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.current-preview__close:hover {
+  color: var(--color-error-600);
+  border-color: var(--color-error-500);
+  background: var(--color-error-50);
 }
 
 .current-preview__title {
@@ -1152,33 +1219,13 @@ onMounted(fetchData)
 }
 
 .panel-footer--pipeline {
-  /* 流水线按钮较多,允许换行 */
   row-gap: 10px;
-}
-
-.panel-footer--platforms {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-}
-
-.platform-label {
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-  font-weight: 500;
 }
 
 .platform-group {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.platform-group--inline {
-  flex: 1;
-  min-width: 0;
-  justify-content: flex-end;
 }
 
 .platform-chip {
@@ -1207,128 +1254,47 @@ onMounted(fetchData)
   display: flex;
   justify-content: flex-end;
   flex-shrink: 0;
+  padding: 12px 24px;
 }
 
-/* Markdown 渲染样式（与 TemplateFill 对齐） */
-.preview-md {
-  padding: 20px 24px 24px;
-  font-size: 13px;
-  line-height: 1.75;
-  color: var(--color-text);
-}
-
-.preview-md :deep(h1),
-.preview-md :deep(h2),
-.preview-md :deep(h3) {
-  margin: 20px 0 8px;
-  font-weight: 600;
-  color: var(--color-text);
-  letter-spacing: 0.01em;
-  line-height: 1.4;
-}
-
-.preview-md :deep(h1) { font-size: 18px; }
-.preview-md :deep(h2) {
-  font-size: 15px;
-  padding-left: 10px;
-  border-left: 3px solid var(--main-color);
-  background: linear-gradient(90deg, var(--main-10) 0%, transparent 70%);
-  border-radius: 2px;
-}
-.preview-md :deep(h3) { font-size: 16px; }
-
-.preview-md :deep(h1:first-child),
-.preview-md :deep(h2:first-child),
-.preview-md :deep(h3:first-child) {
-  margin-top: 0;
-}
-
-.preview-md :deep(p) { margin: 0 0 12px; color: var(--color-text); }
-.preview-md :deep(p:last-child) { margin-bottom: 0; }
-
-.preview-md :deep(hr) {
-  border: none;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--gray-200), transparent);
-  margin: 16px 0;
-}
-
-.preview-md :deep(ul),
-.preview-md :deep(ol) {
-  margin: 8px 0 12px;
-  padding-left: 24px;
-}
-
-.preview-md :deep(li) { margin: 4px 0; }
-.preview-md :deep(li::marker) { color: var(--main-color); }
-
-.preview-md :deep(strong) { font-weight: 600; color: var(--color-text); }
-.preview-md :deep(em) { color: var(--color-text-secondary); font-style: italic; }
-
-.preview-md :deep(code) {
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-  padding: 1px 6px;
-  background: var(--gray-10);
-  border: 1px solid var(--gray-100);
-  border-radius: 4px;
-  color: var(--main-700);
-}
-
-.preview-md :deep(pre) {
-  margin: 8px 0 12px;
-  padding: 12px 14px;
-  background: var(--gray-0);
-  border: 1px solid var(--gray-150);
-  border-radius: 6px;
-  overflow-x: auto;
-  font-size: 12.5px;
+/* 右侧汇总栏样式 */
+.summary-hint {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
   line-height: 1.6;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: var(--main-10);
+  border-radius: 6px;
 }
 
-.preview-md :deep(pre code) {
-  padding: 0;
-  background: transparent;
-  border: none;
-  color: var(--color-text);
-}
-
-.preview-md :deep(a) {
-  color: var(--main-color);
-  text-decoration: none;
-  border-bottom: 1px dashed currentColor;
-}
-
-.preview-md :deep(a:hover) {
+.summary-hint strong {
   color: var(--main-700);
-  border-bottom-style: solid;
 }
 
-.preview-md :deep(blockquote) {
-  margin: 8px 0 12px;
-  padding: 6px 12px;
-  background: var(--gray-10);
-  border-left: 3px solid var(--gray-300);
-  color: var(--color-text-secondary);
-  border-radius: 0 4px 4px 0;
+.summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
 }
 
-@media (max-width: 960px) {
-  .run-layout {
-    grid-template-columns: 1fr;
-  }
-  .step-nav {
-    position: static;
-    flex-direction: row;
-    overflow-x: auto;
-  }
-  .step-nav__title { display: none; }
-  .step-nav__item {
-    min-width: 140px;
-  }
-  .workflow-form {
-    margin-left: 16px;
-    margin-right: 16px;
-  }
+.summary-saved-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 10px;
+  background: var(--color-success-50);
+  color: var(--color-success-700);
+  border: 1px solid var(--color-success-200);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.summary-saved-tip {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  font-style: italic;
 }
 </style>

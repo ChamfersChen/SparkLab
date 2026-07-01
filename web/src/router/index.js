@@ -106,6 +106,12 @@ const routes = [
     meta: { title: '编辑工作流', layout: 'app' }
   },
   {
+    path: '/profile',
+    name: 'profile',
+    component: () => import('@/views/ProfileView.vue'),
+    meta: { title: '个人中心', layout: 'app' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/views/NotFoundView.vue'),

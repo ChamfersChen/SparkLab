@@ -27,6 +27,27 @@ from sparklab.schemas.playbook import (
 _VAR_REGEX = re.compile(r"\{\{(.*?)\}\}")
 
 
+def fill_step_prompt(content: str, form_values: dict | None, prev_output: str | None) -> str:
+    """纯函数: 把 content 里的 {{prev_output}} + {{var}} 按顺序替换.
+
+    - prev_output: 优先替换 (若 content 含 {{prev_output}} 且 prev_output 不为 None)
+    - form_values: 其余 {{var}} 替换
+    """
+    text = content or ""
+    if prev_output and "{{prev_output}}" in text:
+        text = text.replace("{{prev_output}}", prev_output)
+    fv = form_values or {}
+
+    def repl(m):
+        key = m.group(1).strip()
+        if key == "prev_output":
+            return prev_output or m.group(0)
+        val = fv.get(key)
+        return val.strip() if val is not None else m.group(0)
+
+    return _VAR_REGEX.sub(repl, text)
+
+
 class PlaybookService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -373,3 +394,137 @@ class PlaybookService:
             final_prompt=final_prompt,
             steps=rendered_steps,
         )
+
+
+# ===========================================================================
+# 工作流运行记录 (个人中心 / 我的运行记录)
+# ===========================================================================
+
+import json as _json
+from datetime import datetime as _dt
+
+from sparklab.models.playbook import PlaybookRun  # noqa: E402
+from sparklab.repositories.playbook_repository import (
+    PlaybookRunRepository,  # noqa: E402
+    summarize_run,  # noqa: E402
+)
+
+
+class PlaybookRunService:
+    """个人中心「我的运行记录」的业务层.
+
+    与 PlaybookService 平级, 但服务对象不同: 这里是"用户保存的运行结果"而非
+    "工作流定义本身". 故独立类, 共享 session 注入风格.
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+        self.repo = PlaybookRunRepository(db)
+
+    async def create_run(
+        self,
+        *,
+        user,
+        playbook_id: int,
+        title: str | None,
+        steps_data: list[dict],
+        final_result: str | None = None,
+    ) -> PlaybookRun:
+        """保存一次工作流运行结果.
+
+        校验:
+          - user 已登录 (路由层 get_required_user 保证)
+          - playbook 存在且 status=published
+          - steps_data 至少 1 项
+          - step_order 与 playbook 当前步骤一致
+          - 至少粘回 1 个 step 的 AI 结果 OR 在右栏填了 final_result (v4: 可只保存最终结果)
+        """
+        playbook = await self.db.get(Playbook, playbook_id)
+        if playbook is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="工作流不存在",
+            )
+        status_value = (
+            playbook.status.value if hasattr(playbook.status, "value") else playbook.status
+        )
+        if status_value != "published":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="只能保存已发布工作流的运行结果",
+            )
+
+        if not steps_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="至少需要 1 个步骤",
+            )
+
+        valid_orders = {s.step_order for s in playbook.steps}
+        for s in steps_data:
+            if int(s["step_order"]) not in valid_orders:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"steps 含未知 step_order: {s.get('step_order')}",
+                )
+
+        # v4: 至少粘回 1 个 step OR 填了 final_result
+        has_step_output = any((s.get("user_output") or "").strip() for s in steps_data)
+        has_final = bool((final_result or "").strip())
+        if not has_step_output and not has_final:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="至少需要粘回 1 个步骤的 AI 结果,或在右栏填写最终结果",
+            )
+
+        # v4: server 现算每 step 的 filled_prompt 快照
+        # 顺序: 按 step_order 升序; prev_output = 前一步的 user_output
+        sorted_steps = sorted(steps_data, key=lambda s: int(s["step_order"]))
+        # 通过 playbook.steps 关系读取 (已 selectinload, 见 Playbook 定义)
+        step_index_map = {int(p.step_order): p for p in playbook.steps}
+        filled_prompts: list[str | None] = []
+        prev_user_output: str | None = None
+        for s in sorted_steps:
+            order = int(s["step_order"])
+            step_def = step_index_map.get(order)
+            content = step_def.content if step_def else ""
+            fv = s.get("form_values") or {}
+            # 当前 step 的 prev_output = 上一步的 user_output (可能 None)
+            filled = fill_step_prompt(content, fv, prev_user_output)
+            filled_prompts.append(filled)
+            # 更新 prev: 只有非空 user_output 才作为下一步的 prev_output
+            cur_out = (s.get("user_output") or "").strip() or None
+            prev_user_output = cur_out
+
+        # 默认标题: 留空时用 playbook.title + 时间戳
+        final_title = (title or "").strip() or f"{playbook.title} · {_dt.now().strftime('%Y-%m-%d %H:%M')}"
+
+        run = await self.repo.create_with_steps(
+            user_id=user.id,
+            playbook_id=playbook_id,
+            title=final_title,
+            steps_data=steps_data,
+            final_result=final_result,
+            filled_prompts=filled_prompts,
+        )
+        await self.db.commit()
+        return await self.repo.get_by_id_for_user(run.id, user.id)
+
+    async def list_user_runs(
+        self,
+        user_id: int,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[dict], int]:
+        runs, total = await self.repo.list_by_user(user_id, offset=offset, limit=limit)
+        return [summarize_run(r) for r in runs], total
+
+    async def get_user_run(self, user_id: int, run_id: int) -> PlaybookRun | None:
+        return await self.repo.get_by_id_for_user(run_id, user_id)
+
+    async def delete_user_run(self, user_id: int, run_id: int) -> bool:
+        ok = await self.repo.delete(run_id, user_id)
+        if ok:
+            await self.db.commit()
+        return ok

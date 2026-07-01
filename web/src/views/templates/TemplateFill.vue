@@ -1,19 +1,30 @@
 <script setup>
 /**
- * 模板填写页（用户端）。
+ * 模板填写页（用户端，三栏布局）。
  *
- * 布局参考 docs/design.md：
- * - 顶部 Hero：返回按钮 + 标题 + 描述 + 变量进度徽标
- * - 主体两栏：左侧填写表单（带进度条 + 变量字段），右侧生成结果预览（带复制 + 平台快捷入口）
- * - 错误状态用 --color-error-*；主操作「生成提示词」为唯一主按钮
+ * 布局:
+ *   - 左栏: 变量填写表单
+ *   - 中栏: 提示词拼接结果 + AI 平台链接
+ *   - 右栏: AI 回复结果 (markdown textarea) + 保存按钮
  */
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChevronLeft, Copy, ExternalLink, RefreshCcw, Sparkles, Trash2, Wand2 } from 'lucide-vue-next'
 import { message } from 'ant-design-vue'
+import {
+  Check,
+  ChevronLeft,
+  Copy,
+  ExternalLink,
+  RefreshCcw,
+  Save,
+  Sparkles,
+  Trash2,
+  Wand2,
+} from 'lucide-vue-next'
 import MarkdownIt from 'markdown-it'
 import DOMPurify from 'dompurify'
 import { getFillData, incrementUseCount } from '@/apis/template_api'
+import { createTemplateRun } from '@/apis/template_runs_api'
 import { extractVariables } from '@/composables/useTemplateVariables'
 
 const md = new MarkdownIt({ html: false, linkify: true, breaks: true })
@@ -33,13 +44,21 @@ const data = ref(null)
 const formValues = ref({})
 const generatedPrompt = ref('')
 const lastGeneratedAt = ref(null)
+const aiResult = ref('')
+const saveTitle = ref('')
+const saving = ref(false)
+const summarySaved = ref(false)
 
 const renderedPrompt = computed(() => {
   if (!generatedPrompt.value) return ''
   return DOMPurify.sanitize(md.render(generatedPrompt.value))
 })
 
-/** 草稿存储 key：sparklab:template-draft:<id> */
+const renderedAiResult = computed(() => {
+  if (!aiResult.value) return ''
+  return DOMPurify.sanitize(md.render(aiResult.value))
+})
+
 function draftKey(id) {
   return `sparklab:template-draft:${id}`
 }
@@ -48,7 +67,6 @@ function escapeRegex(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-/** 必填变量名列表 = Input 段中提取的变量 ∪ variable_hints 的 key（去重、按出现顺序）。 */
 const variables = computed(() => {
   if (!data.value) return []
   const inputVars = extractVariables(data.value.content || '')
@@ -108,9 +126,11 @@ async function fetchData() {
           generatedPrompt.value = draft.generatedPrompt
           lastGeneratedAt.value = draft.lastGeneratedAt || null
         }
+        if (draft.aiResult) aiResult.value = draft.aiResult
+        if (draft.saveTitle) saveTitle.value = draft.saveTitle
       }
     } catch {
-      // 草稿损坏忽略
+      // ignore
     }
   } catch {
     message.error('模板加载失败')
@@ -119,7 +139,6 @@ async function fetchData() {
   }
 }
 
-/** debounce 500ms 持久化草稿 */
 let persistTimer = null
 function schedulePersistDraft() {
   if (persistTimer) clearTimeout(persistTimer)
@@ -135,22 +154,29 @@ function persistDraft() {
         formValues: { ...formValues.value },
         generatedPrompt: generatedPrompt.value,
         lastGeneratedAt: lastGeneratedAt.value,
+        aiResult: aiResult.value,
+        saveTitle: saveTitle.value,
         savedAt: Date.now(),
-      })
+      }),
     )
   } catch {
-    // localStorage 满 / 隐私模式忽略
+    // ignore
   }
 }
 
 watch(formValues, schedulePersistDraft, { deep: true })
 watch(generatedPrompt, schedulePersistDraft)
+watch(aiResult, schedulePersistDraft)
+watch(saveTitle, schedulePersistDraft)
 
 function clearDraft() {
   if (!data.value) return
   for (const v of varNames.value) formValues.value[v] = ''
   generatedPrompt.value = ''
   lastGeneratedAt.value = null
+  aiResult.value = ''
+  saveTitle.value = ''
+  summarySaved.value = false
   if (persistTimer) {
     clearTimeout(persistTimer)
     persistTimer = null
@@ -166,11 +192,12 @@ function generatePrompt() {
   for (const [key, val] of Object.entries(formValues.value)) {
     filled = filled.replaceAll(
       new RegExp(`\\{\\{\\s*${escapeRegex(key)}\\s*\\}\\}`, 'g'),
-      val.trim()
+      val.trim(),
     )
   }
   generatedPrompt.value = filled
   lastGeneratedAt.value = Date.now()
+  summarySaved.value = false
   persistDraft()
   incrementUseCount(d.template_id || route.params.id).catch(() => {
     message.warning('使用次数上报失败,不影响 Prompt 生成')
@@ -201,6 +228,26 @@ async function openPlatform(url) {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
+async function saveToMyRuns() {
+  if (!generatedPrompt.value || saving.value) return
+  saving.value = true
+  try {
+    await createTemplateRun({
+      template_id: data.value.template_id || Number(route.params.id),
+      form_values: { ...formValues.value },
+      generated_prompt: generatedPrompt.value,
+      title: saveTitle.value.trim() || data.value.title || '',
+      ai_result: aiResult.value || null,
+    })
+    summarySaved.value = true
+    message.success('已保存到「我的使用记录」')
+  } catch {
+    message.error('保存失败,请稍后重试')
+  } finally {
+    saving.value = false
+  }
+}
+
 function formatTime(ts) {
   if (!ts) return ''
   const d = new Date(ts)
@@ -222,17 +269,14 @@ onMounted(fetchData)
     <div class="page-content">
       <a-spin :spinning="loading">
         <template v-if="data">
-          <!-- 顶部:图标+返回+标题 -->
           <header class="page-bar page-bar--fill">
             <div class="page-bar__left-group">
-              <!-- <FileText :size="20" class="page-bar__icon" /> -->
               <button type="button" class="icon-text-btn" @click="goBack">
                 <ChevronLeft :size="16" />
                 <span>返回</span>
               </button>
               <h1 class="page-bar__title">{{ data.title }}</h1>
             </div>
-
             <div v-if="varNames.length" class="hero-progress">
               <span
                 class="progress-pill"
@@ -245,9 +289,8 @@ onMounted(fetchData)
 
           <p v-if="data.description" class="page-bar__sub page-bar__sub--fill">{{ data.description }}</p>
 
-          <!-- 主体两栏:填写表单 + 预览 -->
           <div class="fill-layout">
-            <!-- 左侧:填写表单 -->
+            <!-- 左栏:变量填写表单 -->
             <section class="panel fill-form">
               <div class="panel-header">
                 <h2 class="panel-title">
@@ -310,7 +353,6 @@ onMounted(fetchData)
               <div class="panel-footer panel-footer--actions">
                 <a-button
                   type="primary"
-                  size="large"
                   class="generate-btn"
                   :disabled="!canGenerate"
                   @click="generatePrompt"
@@ -318,17 +360,16 @@ onMounted(fetchData)
                   <template #icon><Sparkles :size="16" /></template>
                   {{ canGenerate ? '生成提示词' : `还有 ${missingCount} 项未填` }}
                 </a-button>
-                <a-tooltip title="清除当前已填写的全部内容和已生成的 Prompt">
+                <a-tooltip title="清除全部内容">
                   <a-button class="reset-btn" @click="clearDraft">
                     <template #icon><Trash2 :size="14" /></template>
-                    清除草稿
                   </a-button>
                 </a-tooltip>
               </div>
             </section>
 
-            <!-- 右侧:预览(sticky,跟随滚动) -->
-            <section class="panel fill-preview">
+            <!-- 中栏:提示词结果 + AI平台 -->
+            <section class="panel fill-prompt">
               <div class="panel-header">
                 <h2 class="panel-title">
                   <span class="panel-title-icon panel-title-icon--accent"><Sparkles :size="16" /></span>
@@ -351,17 +392,17 @@ onMounted(fetchData)
                 </div>
               </div>
 
-              <div class="panel-body panel-body--preview">
-                <div v-if="generatedPrompt" class="preview-markdown" v-html="renderedPrompt" />
-                <div v-else class="preview-placeholder">
-                  <Sparkles :size="32" class="preview-placeholder-icon" />
-                  <p class="preview-placeholder-title">填写左侧变量后,点击「生成提示词」</p>
-                  <p class="preview-placeholder-sub">结果会在这里显示,可一键复制到任意 AI 平台使用</p>
+              <div class="panel-body panel-body--prompt">
+                <div v-if="generatedPrompt" class="prompt-content" v-html="renderedPrompt" />
+                <div v-else class="prompt-placeholder">
+                  <Sparkles :size="32" class="prompt-placeholder-icon" />
+                  <p class="prompt-placeholder-title">填写左侧变量后,点击「生成提示词」</p>
+                  <p class="prompt-placeholder-sub">结果会在这里显示</p>
                 </div>
               </div>
 
               <div v-if="generatedPrompt" class="panel-footer panel-footer--platforms">
-                <span class="platform-label">在 AI 平台中打开</span>
+                <span class="platform-label">复制提示词到 AI 平台</span>
                 <div class="platform-group">
                   <button
                     v-for="p in PLATFORMS"
@@ -376,6 +417,52 @@ onMounted(fetchData)
                 </div>
               </div>
             </section>
+
+            <!-- 右栏:AI结果 + 保存 -->
+            <section class="panel fill-result">
+              <div class="panel-header">
+                <h2 class="panel-title">
+                  <span class="panel-title-icon"><Wand2 :size="16" /></span>
+                  <span>AI 回复结果</span>
+                </h2>
+              </div>
+
+              <div class="panel-body panel-body--result">
+                <a-textarea
+                  v-model:value="aiResult"
+                  placeholder="在 AI 平台获得回复后,将结果粘贴到这里..."
+                  :rows="12"
+                  class="result-textarea"
+                />
+                <div v-if="aiResult" class="result-preview">
+                  <div class="result-preview__label">预览</div>
+                  <div class="result-preview__content" v-html="renderedAiResult" />
+                </div>
+              </div>
+
+              <div class="panel-footer panel-footer--save">
+                <div class="save-row">
+                  <a-input
+                    v-model:value="saveTitle"
+                    placeholder="为这次使用命名（可选）"
+                    class="save-title-input"
+                    :maxlength="200"
+                  />
+                  <a-button
+                    type="primary"
+                    class="save-btn"
+                    :disabled="!generatedPrompt || summarySaved"
+                    :loading="saving"
+                    @click="saveToMyRuns"
+                  >
+                    <template v-if="summarySaved" #icon><Check :size="16" /></template>
+                    <template v-else #icon><Save :size="16" /></template>
+                    {{ summarySaved ? '已保存' : '保存' }}
+                  </a-button>
+                </div>
+                <p class="save-hint">保存到「我的使用记录」,可在个人中心查看</p>
+              </div>
+            </section>
           </div>
         </template>
       </a-spin>
@@ -384,9 +471,6 @@ onMounted(fetchData)
 </template>
 
 <style scoped>
-/* ==========================================================================
- * 页面骨架
- * ========================================================================== */
 .page-bg {
   height: 100vh;
   overflow: hidden;
@@ -411,10 +495,6 @@ onMounted(fetchData)
   flex-direction: column;
 }
 
-.page-bar__title {
-  font-size: 20px;
-}
-
 .page-bar--fill {
   padding: 0 24px;
   flex-shrink: 0;
@@ -422,17 +502,13 @@ onMounted(fetchData)
 
 .page-bar--fill .page-bar__title {
   margin-bottom: 0;
+  font-size: 20px;
 }
 
 .page-bar--fill .page-bar__left-group {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-}
-
-.page-bar--fill .page-bar__icon {
-  color: var(--main-color);
-  flex-shrink: 0;
 }
 
 .page-bar__sub--fill {
@@ -476,57 +552,34 @@ onMounted(fetchData)
   color: var(--gray-600);
 }
 
-/* ==========================================================================
- * 主体两栏布局
- * 关键设计:
- *   1. 两个面板都是 column flex; header / body / footer 三段对齐
- *   2. header min-height 固定 -> 左右栏头部完美对齐(无论内部内容多寡)
- *   3. 右侧 sticky 跟随滚动,顶端贴 24px,最高占满视口 - 48px
- *   4. body 用 flex:1 占满剩余空间,footer 自然贴底
- * ========================================================================== */
+/* 三栏布局 */
 .fill-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
   flex: 1;
   min-height: 0;
   align-items: stretch;
 }
 
-/* ==========================================================================
- * 面板（卡片化,统一 header/body/footer 骨架）
- * ========================================================================== */
+/* 面板 */
 .panel {
   display: flex;
   flex-direction: column;
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.02);
-}
-
-.fill-preview {
   min-height: 0;
 }
 
-.fill-form {
-  min-height: 0;
-}
-
-/* 所有面板 header 同高度 -> 顶部对齐
- * 关键:
- *   - min-height 与 padding 共同保证 box-sizing 下的总高固定
- *   - 子元素统一 align-self: center,避免 Ant 组件默认 baseline 漂移
- *   - header-meta 用 height: 28px 占位,子元素全部 stretch/center
- */
 .panel-header {
   display: flex;
   align-items: stretch;
   justify-content: space-between;
   gap: 12px;
-  min-height: 56px;
-  padding: 0 20px;
+  min-height: 52px;
+  padding: 0 16px;
   box-sizing: border-box;
   background: linear-gradient(180deg, var(--gray-0) 0%, var(--gray-10) 100%);
   border-bottom: 1px solid var(--gray-100);
@@ -534,29 +587,27 @@ onMounted(fetchData)
 }
 
 .panel-header > * {
-  align-self: center;       /* 强制子元素在 56px 内垂直居中,抹平基线差异 */
+  align-self: center;
 }
 
 .panel-title {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  height: 28px;              /* 与 header-meta 同高,保证 baseline 锚定 */
-  font-size: 15px;
+  gap: 8px;
+  height: 28px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
   margin: 0;
-  letter-spacing: 0.01em;
 }
 
-/* 标题图标: 28px 圆角徽章,主色淡底 + 主色 icon */
 .panel-title-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   background: var(--main-10);
   color: var(--main-color);
   flex-shrink: 0;
@@ -571,12 +622,11 @@ onMounted(fetchData)
 .header-meta {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   min-width: 0;
-  height: 28px;             /* 与右侧 header-action-btn 同高,锚定行高 */
+  height: 28px;
 }
 
-/* 进度徽章: 与右侧 header 元素体量一致(高度对齐) */
 .header-badge {
   display: inline-flex;
   align-items: center;
@@ -602,8 +652,8 @@ onMounted(fetchData)
 }
 
 .progress-bar {
-  width: 80px;
-  height: 22px !important;   /* 锁定 Ant Progress 外层高度,避免挤压行高 */
+  width: 60px;
+  height: 22px !important;
   display: flex !important;
   align-items: center;
 }
@@ -649,24 +699,27 @@ onMounted(fetchData)
   background: var(--main-10);
 }
 
-/* body: 占满中段,可滚动 */
 .panel-body {
   flex: 1;
   min-height: 0;
-  padding: 20px;
+  padding: 16px;
   overflow-y: auto;
 }
 
-.panel-body--preview {
+.panel-body--prompt {
   padding: 0;
   background: var(--gray-10);
 }
 
-/* ==========================================================================
- * 填写表单
- * ========================================================================== */
+.panel-body--result {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 左栏:表单 */
 .form-field {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .form-field:last-child {
@@ -711,7 +764,6 @@ onMounted(fetchData)
 .field-input :deep(textarea) {
   background: var(--gray-0);
   border-radius: 8px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .field-hint {
@@ -752,11 +804,9 @@ onMounted(fetchData)
   margin: 0;
 }
 
-/* ==========================================================================
- * footer(两种形态,但外形态体量一致)
- * ========================================================================== */
+/* Footer */
 .panel-footer {
-  padding: 14px 20px;
+  padding: 12px 16px;
   background: var(--gray-10);
   border-top: 1px solid var(--gray-100);
   flex-shrink: 0;
@@ -765,156 +815,102 @@ onMounted(fetchData)
 .panel-footer--actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .generate-btn {
   flex: 1;
-  height: 40px;
+  height: 36px;
   font-weight: 500;
-  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.15);
-  transition: box-shadow 0.15s ease, transform 0.05s ease;
-}
-
-.generate-btn:not(:disabled):hover {
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.28);
-}
-
-.generate-btn:not(:disabled):active {
-  transform: translateY(1px);
 }
 
 .reset-btn {
-  height: 40px;
+  height: 36px;
+  width: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--gray-600);
 }
 
-/* ==========================================================================
- * 预览面板 - Markdown 渲染
- * ========================================================================== */
-.preview-markdown {
-  padding: 20px;
-  font-size: 14px;
+/* 中栏:提示词 */
+.prompt-content {
+  padding: 16px;
+  font-size: 13px;
   line-height: 1.75;
   color: var(--color-text);
   word-break: break-word;
 }
 
-.preview-markdown h2 {
-  font-size: 16px;
+.prompt-content :deep(h2) {
+  font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
-  margin: 24px 0 12px;
-  padding-bottom: 8px;
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--gray-50);
 }
 
-.preview-markdown h2:first-child {
-  margin-top: 0;
+.prompt-content :deep(p) {
+  margin: 0 0 8px;
 }
 
-.preview-markdown p {
-  margin: 0 0 12px;
-  line-height: 1.75;
-}
-
-.preview-markdown hr {
-  border: none;
-  border-top: 1px dashed var(--gray-100);
-  margin: 20px 0;
-}
-
-.preview-markdown ul,
-.preview-markdown ol {
-  padding-left: 20px;
-  margin: 0 0 12px;
-}
-
-.preview-markdown li {
-  margin-bottom: 4px;
-  line-height: 1.75;
-}
-
-.preview-markdown code {
+.prompt-content :deep(code) {
   background: var(--gray-25);
-  padding: 2px 6px;
+  padding: 2px 5px;
   border-radius: 4px;
-  font-size: 13px;
+  font-size: 12px;
   font-family: var(--font-mono);
 }
 
-.preview-markdown pre {
+.prompt-content :deep(pre) {
   background: var(--gray-25);
-  padding: 12px 16px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
   overflow-x: auto;
-  margin: 0 0 12px;
+  margin: 0 0 8px;
 }
 
-.preview-markdown pre code {
+.prompt-content :deep(pre code) {
   background: none;
   padding: 0;
 }
 
-.preview-markdown blockquote {
-  border-left: 3px solid var(--main-color);
-  padding: 4px 12px;
-  margin: 0 0 12px;
-  color: var(--color-text-secondary);
-  background: var(--main-10);
-  border-radius: 0 6px 6px 0;
-}
-
-.preview-markdown strong {
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.preview-markdown a {
-  color: var(--main-color);
-  text-decoration: none;
-}
-
-.preview-markdown a:hover {
-  text-decoration: underline;
-}
-
-.preview-placeholder {
+.prompt-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
   color: var(--color-text-tertiary);
-  min-height: 360px;
-  padding: 40px 24px;
+  min-height: 200px;
+  padding: 32px 20px;
 }
 
-.preview-placeholder-icon {
+.prompt-placeholder-icon {
   color: var(--main-500);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
   opacity: 0.5;
 }
 
-.preview-placeholder-title {
-  font-size: 14px;
+.prompt-placeholder-title {
+  font-size: 13px;
   color: var(--color-text-secondary);
   font-weight: 500;
   margin: 0 0 4px;
 }
 
-.preview-placeholder-sub {
+.prompt-placeholder-sub {
   font-size: 12px;
   color: var(--gray-400);
   margin: 0;
-  line-height: 1.6;
 }
 
 .panel-footer--platforms {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px 10px;
+  gap: 6px 8px;
 }
 
 .platform-label {
@@ -926,21 +922,20 @@ onMounted(fetchData)
 .platform-group {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 
-/* chip 形态:中性边框 + hover 主色淡底,克制感 */
 .platform-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 26px;
-  padding: 0 10px;
+  gap: 3px;
+  height: 24px;
+  padding: 0 8px;
   background: var(--gray-0);
   border: 1px solid var(--gray-200);
   border-radius: 999px;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
@@ -952,64 +947,127 @@ onMounted(fetchData)
   color: var(--main-700);
 }
 
-/* ==========================================================================
- * 响应式
- * ========================================================================== */
-@media (max-width: 960px) {
-  .page-bg {
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
-    padding-bottom: 64px;
-  }
-  .page-content {
-    overflow: visible;
-    display: block;
-  }
-  :deep(.ant-spin-nested-loading),
-  :deep(.ant-spin-container) {
-    overflow: visible;
-    display: block;
-  }
+/* 右栏:AI结果 */
+.result-textarea {
+  width: 100%;
+}
+
+.result-textarea :deep(textarea) {
+  background: var(--gray-0);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.result-preview {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.result-preview__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  margin-bottom: 6px;
+}
+
+.result-preview__content {
+  flex: 1;
+  min-height: 0;
+  padding: 12px;
+  background: var(--gray-10);
+  border: 1px solid var(--gray-150);
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--color-text);
+  overflow-y: auto;
+  word-break: break-word;
+}
+
+.result-preview__content :deep(h2) {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+
+.result-preview__content :deep(p) {
+  margin: 0 0 8px;
+}
+
+.result-preview__content :deep(code) {
+  background: var(--gray-25);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+/* 保存区域 */
+.panel-footer--save {
+  padding: 12px 16px;
+}
+
+.save-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-title-input {
+  flex: 1;
+  height: 34px;
+}
+
+.save-btn {
+  height: 34px;
+  padding: 0 14px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.save-hint {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  margin: 6px 0 0;
+}
+
+/* 响应式 */
+@media (max-width: 1100px) {
   .fill-layout {
-    grid-template-columns: 1fr;
-    min-height: auto;
+    grid-template-columns: 1fr 1fr;
   }
-  .fill-form,
-  .fill-preview {
-    min-height: auto;
-  }
-  .fill-preview {
-    position: static;
-    max-height: none;
+  .fill-result {
+    grid-column: 1 / -1;
   }
 }
 
 @media (max-width: 768px) {
-  .page-content {
-    padding: 16px 0;
-  }
   .fill-layout {
-    padding: 0 12px;
-    gap: 16px;
+    grid-template-columns: 1fr;
   }
   .panel-header {
-    padding: 10px 14px;
-    min-height: 52px;
+    padding: 10px 12px;
+    min-height: 48px;
   }
   .panel-body {
-    padding: 16px;
+    padding: 12px;
   }
   .panel-footer {
-    padding: 12px 14px;
+    padding: 10px 12px;
   }
   .panel-footer--actions {
     flex-direction: column-reverse;
     align-items: stretch;
   }
-  .generate-btn,
-  .reset-btn {
+  .generate-btn {
     width: 100%;
+  }
+  .save-row {
+    flex-direction: column;
+    align-items: stretch;
   }
   .progress-bar {
     display: none;

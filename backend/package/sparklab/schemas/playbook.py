@@ -148,3 +148,89 @@ class PlaybookRunResponse(BaseModel):
     # 完整渲染后的 prompt：工作流 content (替换变量) + 每步 content (替换变量) 用 \n\n---\n\n 串起来
     final_prompt: str
     steps: list[PlaybookRunStep]
+
+
+# ---------------------------------------------------------------------------
+# 运行记录保存（个人中心 / 我的运行记录）
+# ---------------------------------------------------------------------------
+
+def _parse_form_values_json(v):
+    """字段 validator: 把存盘的 JSON 字符串解析为 dict (None / dict 透传)."""
+    if v is None or v == "":
+        return {}
+    if isinstance(v, dict):
+        return v
+    import json
+    try:
+        result = json.loads(v)
+        return result if isinstance(result, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
+class PlaybookRunStepItem(BaseModel):
+    """一次运行中某一步的对外表示 (列表 + 详情共用)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    step_order: int
+    step_name: str
+    user_output: str | None = None
+    # 原始 (Pydantic input) 是 dict, DB 取出来是 JSON 字符串, 由 validator 解析
+    form_values: dict[str, str] = Field(default_factory=dict)
+    # v4: server 现算的 step 补充后 prompt (content + {{var}} + {{prev_output}} 替换后)
+    filled_prompt: str | None = None
+
+    @field_validator("form_values", mode="before")
+    @classmethod
+    def parse_form_values(cls, v):
+        return _parse_form_values_json(v)
+
+
+class PlaybookRunSummary(BaseModel):
+    """列表项 — 不带 steps 详情, 只给统计."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    playbook_id: int
+    playbook_title: str
+    title: str | None = None
+    created_at: datetime
+    # 这次运行中 step 总数 (该 playbook 当时)
+    step_count: int = 0
+    # 实际粘回 AI 结果的 step 数 (user_output 非空)
+    filled_step_count: int = 0
+    # v4: 用户是否在右栏填了"最终结果"
+    has_final_result: bool = False
+
+
+class PlaybookRunDetail(BaseModel):
+    """详情 — 含 steps."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    playbook_id: int
+    playbook_title: str
+    title: str | None = None
+    created_at: datetime
+    updated_at: datetime
+    step_count: int = 0
+    filled_step_count: int = 0
+    has_final_result: bool = False
+    # v4: 用户在三栏右栏填的最终结果 Markdown 源文本
+    final_result: str | None = None
+    steps: list[PlaybookRunStepItem] = []
+
+
+class PlaybookRunCreateRequest(BaseModel):
+    """保存一次运行的请求体."""
+    playbook_id: int
+    title: str | None = Field(default=None, max_length=200)
+    # v4: 用户在三栏页右栏填的"最终结果" (Markdown 源文本, 渲染时后端做)
+    final_result: str | None = None
+    # steps 仍传 user_output + form_values, server 端算 filled_prompt 后存盘
+    steps: list[PlaybookRunStepItem] = Field(..., min_length=1)
+
+
+class PlaybookRunListResponse(BaseModel):
+    items: list[PlaybookRunSummary]
+    total: int

@@ -6,7 +6,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from sparklab.models.template import Template, TemplateStatus, TemplateTag
+from sparklab.models.template import Template, TemplateRun, TemplateStatus, TemplateTag
 
 
 class TemplateRepository:
@@ -171,5 +171,101 @@ class TemplateRepository:
         if not template:
             return False
         await self.db.delete(template)
+        await self.db.flush()
+        return True
+
+
+def detail_run(run: TemplateRun) -> dict:
+    """把 TemplateRun 拆成 detail dict (含完整内容, 前端详情/创建返回用)."""
+    form_values = {}
+    if run.form_values_json:
+        try:
+            import json as _json
+            form_values = _json.loads(run.form_values_json)
+        except (ValueError, TypeError):
+            form_values = {}
+    return {
+        "id": run.id,
+        "template_id": run.template_id,
+        "template_title": run.template.title if run.template else "",
+        "title": run.title,
+        "created_at": run.created_at,
+        "updated_at": run.updated_at,
+        "generated_prompt": run.generated_prompt,
+        "form_values": form_values,
+        "ai_result": run.ai_result,
+    }
+
+
+class TemplateRunRepository:
+    """模板使用记录的 DB 访问层."""
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create_with_prompt(
+        self,
+        *,
+        user_id: int,
+        template_id: int,
+        title: str | None,
+        generated_prompt: str | None,
+        form_values: dict,
+        ai_result: str | None = None,
+    ) -> TemplateRun:
+        run = TemplateRun(
+            user_id=user_id,
+            template_id=template_id,
+            title=title,
+            generated_prompt=generated_prompt,
+            form_values_json=json.dumps(form_values, ensure_ascii=False) if form_values else None,
+            ai_result=ai_result,
+        )
+        self.db.add(run)
+        await self.db.flush()
+        return run
+
+    async def list_by_user(
+        self,
+        user_id: int,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[TemplateRun], int]:
+        count_q = select(func.count(TemplateRun.id)).where(TemplateRun.user_id == user_id)
+        total_result = await self.db.execute(count_q)
+        total = total_result.scalar() or 0
+
+        q = (
+            select(TemplateRun)
+            .where(TemplateRun.user_id == user_id)
+            .order_by(TemplateRun.created_at.desc())
+            .offset(offset)
+            .limit(limit)
+        )
+        result = await self.db.execute(q)
+        return list(result.scalars().all()), total
+
+    async def get_by_id_for_user(
+        self,
+        run_id: int,
+        user_id: int,
+    ) -> TemplateRun | None:
+        run = await self.db.get(TemplateRun, run_id)
+        if run is None:
+            return None
+        if run.user_id != user_id:
+            return None
+        result = await self.db.execute(
+            select(TemplateRun)
+            .where(TemplateRun.id == run_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def delete(self, run_id: int, user_id: int) -> bool:
+        run = await self.db.get(TemplateRun, run_id)
+        if run is None or run.user_id != user_id:
+            return False
+        await self.db.delete(run)
         await self.db.flush()
         return True

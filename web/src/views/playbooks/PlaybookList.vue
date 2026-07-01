@@ -242,56 +242,58 @@ onMounted(() => {
         <span v-if="hasActiveFilter" class="filter-hint">（已应用筛选）</span>
       </div>
 
-      <a-spin :spinning="loading">
-        <ul v-if="items.length" class="playbook-list">
-          <li
-            v-for="item in items"
-            :key="item.id"
-            class="playbook-row"
-            tabindex="0"
-            @click="goRun(item.id)"
-            @keydown.enter="goRun(item.id)"
-          >
-            <div class="row-main">
-              <h3 class="row-title">{{ item.title }}</h3>
-              <p class="row-desc">{{ item.description }}</p>
-            </div>
-            <div class="row-steps">
-              <template v-if="item.steps?.length">
-                <span
-                  v-for="(s, idx) in item.steps.slice(0, 4)"
-                  :key="s.id || idx"
-                  class="step-chip"
-                >
-                  <span class="step-chip__no">{{ idx + 1 }}</span>
-                  <span class="step-chip__name">{{ s.name }}</span>
-                </span>
-                <span v-if="item.steps.length > 4" class="tag-more">+{{ item.steps.length - 4 }}</span>
-              </template>
-              <span v-else class="row-tags-empty">无步骤</span>
-            </div>
-            <div class="row-usage">
-              <Clock :size="13" />
-              <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
-            </div>
-          </li>
-        </ul>
+      <div class="loading-wrap" :class="{ 'loading-wrap--active': loading }">
+        <a-spin :spinning="loading">
+          <ul v-if="items.length" class="playbook-list">
+            <li
+              v-for="item in items"
+              :key="item.id"
+              class="playbook-row"
+              tabindex="0"
+              @click="goRun(item.id)"
+              @keydown.enter="goRun(item.id)"
+            >
+              <div class="row-main">
+                <h3 class="row-title">{{ item.title }}</h3>
+                <p class="row-desc">{{ item.description }}</p>
+              </div>
+              <div class="row-steps">
+                <template v-if="item.steps?.length">
+                  <span
+                    v-for="(s, idx) in item.steps.slice(0, 4)"
+                    :key="s.id || idx"
+                    class="step-chip"
+                  >
+                    <span class="step-chip__no">{{ idx + 1 }}</span>
+                    <span class="step-chip__name">{{ s.name }}</span>
+                  </span>
+                  <span v-if="item.steps.length > 4" class="tag-more">+{{ item.steps.length - 4 }}</span>
+                </template>
+                <span v-else class="row-tags-empty">无步骤</span>
+              </div>
+              <div class="row-usage">
+                <Clock :size="13" />
+                <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
+              </div>
+            </li>
+          </ul>
 
-        <div v-else-if="!loading" class="empty-state">
-          <div class="empty-state__icon">
-            <FileSearch :size="28" />
+          <div v-else-if="!loading" class="empty-state">
+            <div class="empty-state__icon">
+              <FileSearch :size="28" />
+            </div>
+            <h3 class="empty-state__title">
+              {{ hasActiveFilter ? '没有找到匹配的工作流' : '暂无可用工作流' }}
+            </h3>
+            <p class="empty-state__desc">
+              {{ hasActiveFilter ? '试试调整筛选条件,或清除筛选后查看全部' : '管理员发布后,工作流会出现在这里' }}
+            </p>
+            <a-button v-if="hasActiveFilter" type="primary" @click="clearAllFilters">
+              清除筛选
+            </a-button>
           </div>
-          <h3 class="empty-state__title">
-            {{ hasActiveFilter ? '没有找到匹配的工作流' : '暂无可用工作流' }}
-          </h3>
-          <p class="empty-state__desc">
-            {{ hasActiveFilter ? '试试调整筛选条件,或清除筛选后查看全部' : '管理员发布后,工作流会出现在这里' }}
-          </p>
-          <a-button v-if="hasActiveFilter" type="primary" @click="clearAllFilters">
-            清除筛选
-          </a-button>
-        </div>
-      </a-spin>
+        </a-spin>
+      </div>
 
       <div v-if="total > pageSize" class="pagination-wrap">
         <a-pagination
@@ -309,6 +311,16 @@ onMounted(() => {
 
 <style scoped>
 /* 复用 TemplateList 的 toolbar / filter / result-summary 模式, 只重写行样式 */
+
+.loading-wrap {
+  min-height: 120px;
+}
+
+.loading-wrap--active {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
 .playbook-list {
   list-style: none;

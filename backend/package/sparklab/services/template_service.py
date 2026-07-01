@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sparklab.models.tag import Tag
-from sparklab.models.template import Template
-from sparklab.repositories.template_repository import TemplateRepository
+from sparklab.models.template import Template, TemplateStatus
+from sparklab.repositories.template_repository import TemplateRepository, TemplateRunRepository
 
 
 _VAR_REGEX = re.compile(r"\{\{(.*?)\}\}")
@@ -210,3 +210,81 @@ class TemplateService:
     async def extract_variables(self, content: str) -> dict:
         variables = self._extract_variables(content)
         return {"variables": variables}
+
+
+class TemplateRunService:
+    """模板使用记录业务逻辑层."""
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+        self.repo = TemplateRunRepository(db)
+
+    async def create_run(
+        self,
+        *,
+        user,
+        template_id: int,
+        title: str | None,
+        generated_prompt: str,
+        form_values: dict,
+        ai_result: str | None = None,
+    ):
+        from datetime import datetime as _dt
+
+        template = await self.db.get(Template, template_id)
+        if template is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="模板不存在",
+            )
+        status_value = (
+            template.status.value if hasattr(template.status, "value") else template.status
+        )
+        if status_value != "published":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="只能保存已发布模板的使用记录",
+            )
+
+        final_title = (title or "").strip() or f"{template.title} · {_dt.now().strftime('%Y-%m-%d %H:%M')}"
+
+        run = await self.repo.create_with_prompt(
+            user_id=user.id,
+            template_id=template_id,
+            title=final_title,
+            generated_prompt=generated_prompt,
+            form_values=form_values,
+            ai_result=ai_result,
+        )
+        await self.db.commit()
+        return await self.repo.get_by_id_for_user(run.id, user.id)
+
+    async def list_user_runs(
+        self,
+        user_id: int,
+        *,
+        offset: int = 0,
+        limit: int = 20,
+    ) -> tuple[list[dict], int]:
+        runs, total = await self.repo.list_by_user(user_id, offset=offset, limit=limit)
+        return [
+            {
+                "id": r.id,
+                "template_id": r.template_id,
+                "template_title": r.template.title if r.template else "",
+                "title": r.title,
+                "created_at": r.created_at,
+                "has_prompt": bool((r.generated_prompt or "").strip()),
+                "has_result": bool((r.ai_result or "").strip()),
+            }
+            for r in runs
+        ], total
+
+    async def get_user_run(self, user_id: int, run_id: int):
+        return await self.repo.get_by_id_for_user(run_id, user_id)
+
+    async def delete_user_run(self, user_id: int, run_id: int) -> bool:
+        ok = await self.repo.delete(run_id, user_id)
+        if ok:
+            await self.db.commit()
+        return ok

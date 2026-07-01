@@ -7,7 +7,14 @@
 
 from sparklab.models.activation_code import ActivationCode, ActivationCodeStatus
 from sparklab.models.base import Base, TimestampMixin
-from sparklab.models.playbook import Playbook, PlaybookStatus, PlaybookStep, PlaybookTag
+from sparklab.models.playbook import (
+    Playbook,
+    PlaybookRun,
+    PlaybookRunStep,
+    PlaybookStatus,
+    PlaybookStep,
+    PlaybookTag,
+)
 from sparklab.models.tag import Tag, TagCategory
 from sparklab.models.template import Template, TemplateStatus, TemplateTag
 from sparklab.models.user import User, UserRole
@@ -28,4 +35,6 @@ __all__ = [
     "PlaybookStatus",
     "PlaybookStep",
     "PlaybookTag",
+    "PlaybookRun",
+    "PlaybookRunStep",
 ]

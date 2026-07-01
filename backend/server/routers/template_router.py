@@ -2,6 +2,10 @@
 
 普通用户和管理员都可调用：
 - GET    /api/templates              → 模板列表（搜索+标签+状态筛选+分页+排序）
+- GET    /api/templates/runs         → 当前用户「模板使用记录」列表
+- POST   /api/templates/runs         → 保存一次模板使用结果
+- GET    /api/templates/runs/{run_id}→ 单条使用记录详情
+- DELETE /api/templates/runs/{run_id}→ 删除一条使用记录
 - GET    /api/templates/{id}         → 模板详情
 - GET    /api/templates/{id}/fill    → 模板填写数据（变量提取 + hints）
 - POST   /api/templates/{id}/use     → 使用计数 +1
@@ -11,12 +15,16 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sparklab.models.user import User
+from sparklab.repositories.template_repository import detail_run
 from sparklab.schemas.template import (
     FillDataResponse,
     TemplateListResponse,
     TemplateResponse,
+    TemplateRunCreateRequest,
+    TemplateRunDetail,
+    TemplateRunListResponse,
 )
-from sparklab.services.template_service import TemplateService
+from sparklab.services.template_service import TemplateService, TemplateRunService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.utils.auth_middleware import get_db, get_required_user
@@ -26,6 +34,10 @@ template = APIRouter(prefix="/templates", tags=["模板"])
 
 async def _get_service(db: AsyncSession = Depends(get_db)) -> TemplateService:
     return TemplateService(db)
+
+
+async def _get_run_service(db: AsyncSession = Depends(get_db)) -> TemplateRunService:
+    return TemplateRunService(db)
 
 
 def _parse_tag_id_groups(raw: str | None) -> list[list[int]] | None:
@@ -46,6 +58,76 @@ def _parse_tag_id_groups(raw: str | None) -> list[list[int]] | None:
             groups.append(ids)
     return groups or None
 
+
+# ---------------------------------------------------------------------------
+# 使用记录 (个人中心 / 我的模板使用记录)
+# 必须在 {template_id} 路径之前声明, 否则会被参数化路径吞掉
+# ---------------------------------------------------------------------------
+
+@template.get("/runs", response_model=TemplateRunListResponse)
+async def list_my_runs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    user=Depends(get_required_user),
+    run_service: TemplateRunService = Depends(_get_run_service),
+):
+    """当前用户的模板使用记录列表, 按 created_at DESC."""
+    items, total = await run_service.list_user_runs(
+        user.id, offset=(page - 1) * page_size, limit=page_size,
+    )
+    return TemplateRunListResponse(items=items, total=total)
+
+
+@template.post("/runs", response_model=TemplateRunDetail, status_code=status.HTTP_201_CREATED)
+async def create_run(
+    body: TemplateRunCreateRequest,
+    user=Depends(get_required_user),
+    run_service: TemplateRunService = Depends(_get_run_service),
+):
+    """保存一次模板使用结果."""
+    run = await run_service.create_run(
+        user=user,
+        template_id=body.template_id,
+        title=body.title,
+        generated_prompt=body.generated_prompt,
+        form_values=body.form_values,
+        ai_result=body.ai_result,
+    )
+    return detail_run(run)
+
+
+@template.get("/runs/{run_id}", response_model=TemplateRunDetail)
+async def get_my_run(
+    run_id: int,
+    user=Depends(get_required_user),
+    run_service: TemplateRunService = Depends(_get_run_service),
+):
+    run = await run_service.get_user_run(user.id, run_id)
+    if run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="使用记录不存在",
+        )
+    return detail_run(run)
+
+
+@template.delete("/runs/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_my_run(
+    run_id: int,
+    user=Depends(get_required_user),
+    run_service: TemplateRunService = Depends(_get_run_service),
+):
+    ok = await run_service.delete_user_run(user.id, run_id)
+    if not ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="使用记录不存在",
+        )
+
+
+# ---------------------------------------------------------------------------
+# 模板本身的端点 (参数化路径放最后)
+# ---------------------------------------------------------------------------
 
 @template.get("", response_model=TemplateListResponse)
 async def list_templates(

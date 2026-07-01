@@ -67,6 +67,45 @@ class Template(Base, TimestampMixin):
         backref="templates",
         lazy="selectin",
     )
+    runs: Mapped[list["TemplateRun"]] = relationship(
+        "TemplateRun",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     def __repr__(self) -> str:
         return f"<Template id={self.id} title={self.title!r} status={self.status.value}>"
+
+
+class TemplateRun(Base, TimestampMixin):
+    """模板的一次使用记录 — 用户在个人中心回看。
+
+    保存用户填写的变量值、生成的最终 prompt。
+    """
+
+    __tablename__ = "template_runs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    template_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("templates.id", ondelete="CASCADE"), nullable=False
+    )
+    # 用户自定义标题; 默认值由 service 层根据 template.title + 时间戳生成
+    title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # 生成的最终 prompt
+    generated_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 用户填写的变量值 (JSON 快照)
+    form_values_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # AI 平台返回的结果 (用户粘贴)
+    ai_result: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # 关联
+    template: Mapped["Template"] = relationship(
+        "Template",
+        lazy="joined",
+    )
+
+    def __repr__(self) -> str:
+        return f"<TemplateRun id={self.id} user_id={self.user_id} template_id={self.template_id}>"

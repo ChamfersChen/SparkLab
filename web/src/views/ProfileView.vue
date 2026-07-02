@@ -45,8 +45,8 @@ if (!userStore.isLoggedIn) {
 const currentTab = ref('basic')
 const navItems = [
   { key: 'basic', label: '基础信息', icon: Settings },
-  { key: 'templates', label: '模板使用记录', icon: FileText },
-  { key: 'playbooks', label: '工作流使用记录', icon: LayoutGrid },
+  { key: 'templates', label: '模板', icon: FileText },
+  { key: 'playbooks', label: '工作流', icon: LayoutGrid },
 ]
 
 /* ── 工作流运行记录 ── */
@@ -192,7 +192,7 @@ function closeTemplateDetail() {
 
 function handleDeleteTemplateRun(run) {
   Modal.confirm({
-    title: `删除使用记录「${run.title || run.template_title}」?`,
+    title: `删除「${run.title || run.template_title}」?`,
     content: '此操作不可恢复。',
     okText: '删除',
     cancelText: '取消',
@@ -333,11 +333,11 @@ function switchTab(key) {
             </div>
           </section>
 
-          <!-- ====== 模板使用记录 ====== -->
+          <!-- ====== 模板保存 ====== -->
           <section v-else-if="currentTab === 'templates'" class="card-block">
             <h2 class="section-title">
               <FileText :size="16" />
-              <span>模板使用记录</span>
+              <span>保存的模板</span>
               <span class="section-title__count" v-if="templateTotal > 0">共 {{ templateTotal }} 条</span>
             </h2>
 
@@ -346,9 +346,9 @@ function switchTab(key) {
                 <div class="empty-state__icon">
                   <FileText :size="28" />
                 </div>
-                <h3 class="empty-state__title">还没有使用记录</h3>
+                <h3 class="empty-state__title">还没有保存记录</h3>
                 <p class="empty-state__desc">
-                  填写模板变量并生成提示词后，点击「保存到我的使用记录」，即可在这里查看历史结果。
+                  填写模板变量并生成提示词后，点击「保存到我的」，即可在这里查看历史结果。
                 </p>
                 <a-button type="primary" @click="$router.push({ name: 'templates' })">
                   去模板库
@@ -407,11 +407,11 @@ function switchTab(key) {
             </a-spin>
           </section>
 
-          <!-- ====== 工作流使用记录 ====== -->
+          <!-- ====== 保存工作流 ====== -->
           <section v-else class="card-block">
             <h2 class="section-title">
               <LayoutGrid :size="16" />
-              <span>工作流使用记录</span>
+              <span>保存工作流</span>
               <span class="section-title__count" v-if="total > 0">共 {{ total }} 条</span>
             </h2>
 
@@ -420,9 +420,9 @@ function switchTab(key) {
                 <div class="empty-state__icon">
                   <BookOpen :size="28" />
                 </div>
-                <h3 class="empty-state__title">还没有运行记录</h3>
+                <h3 class="empty-state__title">还没有保存记录</h3>
                 <p class="empty-state__desc">
-                  完成一个工作流后，点击「保存到我的运行」，即可在这里查看历史结果。
+                  完成一个工作流后，点击「保存到我的运行」，即可在这里查看保存结果。
                 </p>
                 <a-button type="primary" @click="$router.push({ name: 'playbooks' })">
                   去工作流库

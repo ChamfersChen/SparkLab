@@ -240,7 +240,7 @@ async function saveToMyRuns() {
       ai_result: aiResult.value || null,
     })
     summarySaved.value = true
-    message.success('已保存到「我的使用记录」')
+    message.success('已保存到「个人中心 - 模板」')
   } catch {
     message.error('保存失败,请稍后重试')
   } finally {
@@ -460,7 +460,7 @@ onMounted(fetchData)
                     {{ summarySaved ? '已保存' : '保存' }}
                   </a-button>
                 </div>
-                <p class="save-hint">保存到「我的使用记录」,可在个人中心查看</p>
+                <p class="save-hint">保存到「个人中心 - 模板」,可在个人中心查看</p>
               </div>
             </section>
           </div>

@@ -443,4 +443,20 @@ onMounted(() => {
   flex-wrap: nowrap;
   gap: 4px;
 }
+
+@media (max-width: 768px) {
+  .page-content {
+    padding: 16px;
+  }
+
+  .toolbar-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbar-card .ant-select,
+  .toolbar-card .ant-input-search {
+    width: 100% !important;
+  }
+}
 </style>

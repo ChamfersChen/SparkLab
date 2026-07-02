@@ -606,11 +606,11 @@ onMounted(fetchData)
                       :loading="saving"
                       @click="confirmSaveSummary"
                     >
-                      保存到我的运行
+                      保存
                     </a-button>
                     <span v-if="summarySaved" class="summary-saved-tag">✓ 已保存</span>
                     <span v-else class="summary-saved-tip">
-                      可随时保存 — 不会打断你的编辑
+                      可随时保存 — 不会打断你的编辑. 可在「个人中心 - 工作流」查看
                     </span>
                   </div>
                 </div>
@@ -1297,5 +1297,88 @@ onMounted(fetchData)
   font-size: 12px;
   color: var(--color-text-tertiary);
   font-style: italic;
+}
+
+/* ========== Mobile (<=768px) ========== */
+@media (max-width: 768px) {
+  .page-bg {
+    height: auto;
+    overflow: visible;
+  }
+
+  .page-content {
+    overflow: visible;
+    padding: 16px 0 0;
+  }
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    overflow: visible;
+  }
+
+  .page-bar--fill {
+    padding: 0 16px;
+  }
+
+  .page-bar__sub--fill {
+    padding: 0 16px;
+    margin-bottom: 12px;
+  }
+
+  .run-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 0 16px 16px;
+  }
+
+  .step-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 10px 12px;
+    height: auto;
+    position: static;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .step-nav__title {
+    display: none;
+  }
+
+  .step-nav__item {
+    grid-template-columns: 22px 1fr;
+    flex-shrink: 0;
+    min-width: 120px;
+    padding: 6px 10px;
+  }
+
+  .step-nav__desc {
+    display: none;
+  }
+
+  .step-nav__divider {
+    display: none;
+  }
+
+  .step-nav__platform-title {
+    display: none;
+  }
+
+  .step-nav__platforms {
+    display: none;
+  }
+
+  .platform-chip--sidebar {
+    width: auto;
+  }
+
+  .middle-pane,
+  .summary-pane {
+    overflow-y: visible;
+  }
+
+  .run-toolbar {
+    padding: 12px 16px;
+  }
 }
 </style>

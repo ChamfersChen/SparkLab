@@ -141,4 +141,14 @@ async function handleLogin() {
 .footer-hint a {
   color: var(--main-color);
 }
+
+@media (max-width: 768px) {
+  .login-view {
+    padding: 16px;
+  }
+
+  .card {
+    padding: 24px 20px;
+  }
+}
 </style>

@@ -285,4 +285,10 @@ onMounted(fetchData)
 
 .icon-save { color: var(--color-success-700); }
 .icon-cancel { color: var(--color-danger-700); }
+
+@media (max-width: 768px) {
+  .admin-content {
+    padding: 16px;
+  }
+}
 </style>

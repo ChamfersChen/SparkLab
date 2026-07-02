@@ -29,7 +29,8 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Menu,
 } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 
@@ -38,6 +39,11 @@ const router = useRouter()
 const route = useRoute()
 
 const collapsed = ref(false)
+const mobileDrawerOpen = ref(false)
+
+function closeDrawer() {
+  mobileDrawerOpen.value = false
+}
 
 // 用户端导航
 const userNavItems = [
@@ -99,6 +105,33 @@ const roleLabel = computed(() => {
 
 <template>
   <div class="app-layout" :class="{ collapsed }">
+    <!-- 移动端顶部栏 (桌面端隐藏) -->
+    <div class="mobile-topbar">
+      <button class="mobile-hamburger" @click="mobileDrawerOpen = true">
+        <Menu :size="20" />
+      </button>
+      <router-link to="/" class="mobile-brand">
+        <div class="brand-icon">S</div>
+        <span class="brand-name">SparkLab</span>
+      </router-link>
+      <a-dropdown placement="bottomRight" :trigger="['click']">
+        <button class="mobile-avatar">
+          {{ (userStore.user?.username || 'U')[0].toUpperCase() }}
+        </button>
+        <template #overlay>
+          <a-menu>
+            <a-menu-item @click="navigate('/profile')">
+              <User :size="14" /> 个人中心
+            </a-menu-item>
+            <a-menu-divider />
+            <a-menu-item @click="handleLogout">
+              <LogOut :size="14" /> 退出登录
+            </a-menu-item>
+          </a-menu>
+        </template>
+      </a-dropdown>
+    </div>
+
     <!-- 左侧导航 -->
     <aside class="sidebar">
       <!-- 品牌区 -->
@@ -185,6 +218,65 @@ const roleLabel = computed(() => {
     <main class="main-content">
       <slot />
     </main>
+
+    <!-- 移动端导航抽屉 -->
+    <a-drawer
+      :open="mobileDrawerOpen"
+      placement="left"
+      :width="260"
+      :closable="false"
+      :body-style="{ padding: 0 }"
+      @close="closeDrawer"
+    >
+      <div class="drawer-sidebar">
+        <div class="sidebar-brand">
+          <router-link to="/" class="brand-link" @click="closeDrawer">
+            <div class="brand-icon">S</div>
+            <span class="brand-name">SparkLab</span>
+          </router-link>
+        </div>
+        <div class="sidebar-nav">
+          <div class="nav-section">
+            <div class="nav-section-title">导航</div>
+            <router-link
+              v-for="item in userNavItems"
+              :key="item.path"
+              :to="item.path"
+              class="nav-item"
+              :class="{ active: isActive(item.path) }"
+              @click="closeDrawer"
+            >
+              <component :is="item.icon" :size="18" class="nav-icon" />
+              <span class="nav-text">{{ item.name }}</span>
+            </router-link>
+          </div>
+          <div v-if="userStore.isAdmin" class="nav-divider" />
+          <div v-if="userStore.isAdmin" class="nav-section">
+            <div class="nav-section-title">管理后台</div>
+            <router-link
+              v-for="item in adminNavItems"
+              :key="item.path"
+              :to="item.path"
+              class="nav-item"
+              :class="{ active: isActive(item.path) }"
+              @click="closeDrawer"
+            >
+              <component :is="item.icon" :size="18" class="nav-icon" />
+              <span class="nav-text">{{ item.name }}</span>
+            </router-link>
+          </div>
+        </div>
+        <div class="sidebar-footer">
+          <div class="user-section">
+            <div class="user-avatar">{{ (userStore.user?.username || 'U')[0].toUpperCase() }}</div>
+            <div class="user-info">
+              <div class="user-name">{{ userStore.user?.username }}</div>
+              <div class="user-role">{{ roleLabel }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </a-drawer>
   </div>
 </template>
 
@@ -415,6 +507,70 @@ const roleLabel = computed(() => {
   background: var(--gray-10);
 }
 
+/* ========== Mobile Topbar (default hidden) ========== */
+.mobile-topbar {
+  display: none;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 16px;
+  background: var(--gray-0);
+  border-bottom: 1px solid var(--gray-50);
+  flex-shrink: 0;
+}
+
+.mobile-hamburger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mobile-hamburger:hover {
+  background: var(--gray-10);
+}
+
+.mobile-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: var(--color-text);
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: var(--main-10);
+  color: var(--main-700);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Drawer sidebar reuses sidebar styles */
+.drawer-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--gray-0);
+}
+
 /* Collapsed adjustments */
 .collapsed .nav-section-title,
 .collapsed .nav-divider {
@@ -441,5 +597,25 @@ const roleLabel = computed(() => {
 
 .collapsed .user-menu-btn {
   display: none;
+}
+
+/* ========== Mobile (<=768px) ========== */
+@media (max-width: 768px) {
+  .app-layout {
+    flex-direction: column;
+  }
+
+  .mobile-topbar {
+    display: flex;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .main-content {
+    width: 100%;
+    min-height: 0;
+  }
 }
 </style>

@@ -424,7 +424,7 @@ function switchTab(key) {
                 </div>
                 <h3 class="empty-state__title">还没有保存记录</h3>
                 <p class="empty-state__desc">
-                  完成一个工作流后，点击「保存到我的运行」，即可在这里查看保存结果。
+                  完成一个工作流后，点击「保存」，即可在「个人中心 - 工作流」查看保存结果。
                 </p>
                 <a-button type="primary" @click="$router.push({ name: 'playbooks' })">
                   去工作流库
@@ -1102,5 +1102,53 @@ function switchTab(key) {
 .final-result-card--ai {
   background: var(--gray-0);
   border-color: var(--gray-200);
+}
+
+/* ========== Mobile (<=768px) ========== */
+@media (max-width: 768px) {
+  .page-content {
+    height: auto;
+    overflow: visible;
+  }
+
+  .page-bar {
+    padding: 0 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .profile-layout {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 0 16px 16px;
+  }
+
+  .profile-nav {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 4px;
+    padding: 8px;
+    position: static;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .profile-nav__title {
+    display: none;
+  }
+
+  .profile-nav__item {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 6px 12px;
+  }
+
+  .profile-main {
+    overflow-y: visible;
+  }
+
+  .drawer-content {
+    width: 100% !important;
+  }
 }
 </style>

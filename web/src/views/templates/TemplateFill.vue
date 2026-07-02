@@ -462,7 +462,7 @@ onMounted(fetchData)
                     {{ summarySaved ? '已保存' : '保存' }}
                   </a-button>
                 </div>
-                <p class="save-hint">保存到「个人中心 - 模板」,可在个人中心查看</p>
+                <p class="save-hint">保存到「个人中心 - 模板」</p>
               </div>
             </section>
           </div>
@@ -1046,6 +1046,21 @@ onMounted(fetchData)
 }
 
 @media (max-width: 768px) {
+  .page-bg {
+    height: auto;
+    overflow: visible;
+  }
+
+  .page-content {
+    overflow: visible;
+    padding: 16px;
+  }
+
+  :deep(.ant-spin-nested-loading),
+  :deep(.ant-spin-container) {
+    overflow: visible;
+  }
+
   .fill-layout {
     grid-template-columns: 1fr;
   }

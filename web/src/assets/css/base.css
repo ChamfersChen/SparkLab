@@ -662,4 +662,9 @@
     padding: 12px;
     gap: 8px;
   }
+
+  .search-input {
+    max-width: none;
+    width: 100%;
+  }
 }

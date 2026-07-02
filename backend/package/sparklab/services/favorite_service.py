@@ -1,6 +1,7 @@
 """收藏业务逻辑层。"""
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sparklab.models.favorite import FavoriteTargetType
@@ -18,7 +19,7 @@ class FavoriteService:
         """校验目标存在且已发布。"""
         if target_type == FavoriteTargetType.TEMPLATE:
             result = await self.db.execute(
-                __import__("sqlalchemy").select(Template).where(Template.id == target_id)
+                select(Template).where(Template.id == target_id)
             )
             tpl = result.scalar_one_or_none()
             if not tpl:
@@ -27,7 +28,7 @@ class FavoriteService:
                 raise HTTPException(status_code=400, detail="该模板未发布,无法收藏")
         else:
             result = await self.db.execute(
-                __import__("sqlalchemy").select(Playbook).where(Playbook.id == target_id)
+                select(Playbook).where(Playbook.id == target_id)
             )
             pb = result.scalar_one_or_none()
             if not pb:

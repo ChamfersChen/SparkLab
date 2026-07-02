@@ -271,9 +271,15 @@ onMounted(() => {
                 </template>
                 <span v-else class="row-tags-empty">无步骤</span>
               </div>
-              <div class="row-usage">
-                <Clock :size="13" />
-                <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
+              <div class="row-tail">
+                <div v-if="item.tags?.length" class="row-tags">
+                  <span v-for="t in item.tags.slice(0, 3)" :key="t.id" class="card-tag">{{ t.name }}</span>
+                  <span v-if="item.tags.length > 3" class="tag-more">+{{ item.tags.length - 3 }}</span>
+                </div>
+                <div class="row-usage">
+                  <Clock :size="12" />
+                  <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
+                </div>
               </div>
             </li>
           </ul>
@@ -335,24 +341,24 @@ onMounted(() => {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 2fr) auto;
   align-items: center;
-  gap: 24px;
-  padding: 14px 20px;
+  gap: 16px;
+  padding: 10px 16px;
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
   outline: none;
 }
 
 .playbook-row:hover {
   border-color: var(--main-color);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  background: var(--gray-10);
 }
 
 .playbook-row:focus-visible {
   border-color: var(--main-color);
-  box-shadow: 0 0 0 3px var(--main-100, rgba(59, 130, 246, 0.12));
+  box-shadow: 0 0 0 3px var(--main-100);
 }
 
 .row-main {
@@ -360,10 +366,10 @@ onMounted(() => {
 }
 
 .row-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -413,7 +419,7 @@ onMounted(() => {
   height: 16px;
   border-radius: 50%;
   background: var(--main-color);
-  color: #fff;
+  color: var(--gray-0);
   font-size: 10px;
   font-weight: 600;
   line-height: 1;
@@ -431,14 +437,42 @@ onMounted(() => {
   color: var(--color-text-tertiary);
 }
 
+.row-tail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+  min-width: 0;
+}
+
+.row-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.card-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  background: var(--main-10);
+  color: var(--main-700);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .row-usage {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 4px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   white-space: nowrap;
-  justify-self: end;
+  flex-shrink: 0;
 }
 
 .row-usage strong {
@@ -458,8 +492,9 @@ onMounted(() => {
     gap: 8px;
     padding: 12px 14px;
   }
-  .row-usage {
+  .row-tail {
     justify-self: start;
+    flex-wrap: wrap;
   }
 }
 </style>

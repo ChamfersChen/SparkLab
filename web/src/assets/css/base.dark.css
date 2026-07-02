@@ -10,6 +10,9 @@
   --main-700: #93c5fd;
   --main-600: #60a5fa;
   --main-500: #3b82f6;
+  --main-300: #60a5fa;
+  --main-200: #3b82f6;
+  --main-100: #1e3a8a;
   --main-50: #172554;
   --main-30: #1e3a8a;
   --main-10: #1e3a8a;
@@ -22,9 +25,11 @@
   --gray-100: #475569;
   --gray-150: #64748b;
   --gray-200: #94a3b8;
+  --gray-300: #64748b;
   --gray-400: #cbd5e1;
   --gray-500: #94a3b8;
   --gray-600: #cbd5e1;
+  --gray-700: #94a3b8;
   --gray-900: #f1f5f9;
   --gray-1000: #ffffff;
 
@@ -34,16 +39,38 @@
 
   /* --- 语义色保持深文字 + 浅背景的对比逻辑，但调到暗色基调 --- */
   --color-success-50: #064e3b;
+  --color-success-100: #047857;
+  --color-success-200: #059669;
+  --color-success-500: #10b981;
   --color-success-700: #6ee7b7;
+  --color-success-900: #a7f3d0;
 
   --color-error-50: #7f1d1d;
+  --color-error-100: #991b1b;
+  --color-error-200: #b91c1c;
+  --color-error-300: #dc2626;
+  --color-error-500: #ef4444;
+  --color-error-600: #f87171;
   --color-error-700: #fca5a5;
+  --color-error-900: #fecaca;
 
   --color-warning-50: #78350f;
+  --color-warning-100: #92400e;
+  --color-warning-200: #b45309;
+  --color-warning-500: #f59e0b;
+  --color-warning-700: #fcd34d;
   --color-warning-900: #fde68a;
 
   --color-info-50: #1e3a8a;
+  --color-info-100: #1e40af;
+  --color-info-500: #3b82f6;
   --color-info-700: #93c5fd;
+  --color-info-900: #bfdbfe;
+
+  /* --- 辅助强调 --- */
+  --color-accent-50: #581c87;
+  --color-accent-500: #a855f7;
+  --color-accent-700: #d8b4fe;
 
   /* --- 阴影更深 --- */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);

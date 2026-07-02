@@ -641,7 +641,7 @@ function switchTab(key) {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
+  grid-template-columns: 200px minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -810,17 +810,17 @@ function switchTab(key) {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 12px 16px;
   background: var(--gray-10);
   border: 1px solid var(--gray-150);
-  border-radius: 10px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  border-radius: 8px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
   cursor: pointer;
 }
 
 .run-card:hover {
   border-color: var(--main-color);
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.08);
+  background: var(--main-10);
 }
 
 .run-card--active {
@@ -878,7 +878,7 @@ function switchTab(key) {
   background: var(--color-success-50);
   color: var(--color-success-700);
   border: 1px solid var(--color-success-200);
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
@@ -892,7 +892,7 @@ function switchTab(key) {
   background: var(--main-10);
   color: var(--main-700);
   border: 1px solid var(--main-200);
-  border-radius: 10px;
+  border-radius: 999px;
   font-size: 11px;
   font-weight: 500;
   white-space: nowrap;
@@ -1050,7 +1050,7 @@ function switchTab(key) {
 }
 
 .copy-inline-btn:active {
-  transform: scale(0.92);
+  background: var(--main-50);
 }
 
 .final-result-card {
@@ -1067,7 +1067,7 @@ function switchTab(key) {
 .final-result-card :deep(h2) {
   font-size: 15px; margin: 12px 0 6px; padding-left: 10px;
   border-left: 3px solid var(--main-color);
-  background: linear-gradient(90deg, var(--main-10) 0%, transparent 70%);
+  background: var(--main-10);
   border-radius: 2px; font-weight: 600;
 }
 .final-result-card :deep(h3) { font-size: 14px; margin: 10px 0 4px; font-weight: 600; }

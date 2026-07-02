@@ -296,17 +296,20 @@ onMounted(() => {
               @click="goDetail(item.id)"
               @keydown.enter="goDetail(item.id)"
             >
-              <h3 class="row-title">{{ item.title }}</h3>
-              <div class="row-tags">
-                <template v-if="item.tags?.length">
-                  <span v-for="t in item.tags.slice(0, 4)" :key="t.id" class="card-tag">{{ t.name }}</span>
-                  <span v-if="item.tags.length > 4" class="tag-more">+{{ item.tags.length - 4 }}</span>
-                </template>
-                <span v-else class="row-tags-empty">—</span>
+              <div class="row-main">
+                <h3 class="row-title">{{ item.title }}</h3>
+                <p v-if="item.description" class="row-desc">{{ item.description }}</p>
+                <span v-else class="row-desc-empty">暂无描述</span>
               </div>
-              <div class="row-usage">
-                <Clock :size="13" />
-                <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
+              <div class="row-tail">
+                <div v-if="item.tags?.length" class="row-tags">
+                  <span v-for="t in item.tags.slice(0, 3)" :key="t.id" class="card-tag">{{ t.name }}</span>
+                  <span v-if="item.tags.length > 3" class="tag-more">+{{ item.tags.length - 3 }}</span>
+                </div>
+                <div class="row-usage">
+                  <Clock :size="12" />
+                  <span><strong>{{ item.use_count || 0 }}</strong> 次使用</span>
+                </div>
               </div>
             </li>
           </ul>
@@ -361,37 +364,44 @@ onMounted(() => {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .template-row {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 2fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 24px;
-  padding: 14px 20px;
+  gap: 12px;
+  padding: 10px 14px;
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
   outline: none;
 }
 
 .template-row:hover {
-  border-color: var(--main-300, var(--gray-300));
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-color: var(--main-color);
+  background: var(--gray-10);
 }
 
 .template-row:focus-visible {
-  border-color: var(--main-500, var(--gray-400));
-  box-shadow: 0 0 0 3px var(--main-100, rgba(0, 0, 0, 0.06));
+  border-color: var(--main-color);
+  box-shadow: 0 0 0 3px var(--main-100);
+}
+
+.row-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .row-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--color-text);
   margin: 0;
@@ -399,30 +409,51 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.row-tags {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
   min-width: 0;
 }
 
-.row-tags-empty {
+.row-desc {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin: 0;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-desc-empty {
   font-size: 12px;
   color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+.row-tail {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+  min-width: 0;
+}
+
+.row-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 .card-tag {
   display: inline-flex;
   align-items: center;
-  padding: 2px 10px;
-  background: var(--gray-10);
-  color: var(--color-text-secondary);
+  padding: 1px 8px;
+  background: var(--main-10);
+  color: var(--main-700);
   border-radius: 999px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .tag-more {
@@ -434,11 +465,11 @@ onMounted(() => {
 .row-usage {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 4px;
+  font-size: 12px;
   color: var(--color-text-tertiary);
   white-space: nowrap;
-  justify-self: end;
+  flex-shrink: 0;
 }
 
 .row-usage strong {
@@ -452,6 +483,12 @@ onMounted(() => {
   justify-content: center;
 }
 
+@media (max-width: 960px) {
+  .template-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 768px) {
   .search-input {
     max-width: none;
@@ -459,10 +496,11 @@ onMounted(() => {
   .template-row {
     grid-template-columns: 1fr;
     gap: 8px;
-    padding: 12px 14px;
+    padding: 10px 12px;
   }
-  .row-usage {
+  .row-tail {
     justify-self: start;
+    flex-wrap: wrap;
   }
   .filter-group {
     flex-direction: column;

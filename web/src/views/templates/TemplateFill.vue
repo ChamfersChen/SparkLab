@@ -568,7 +568,7 @@ onMounted(fetchData)
   flex-direction: column;
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   min-height: 0;
 }
@@ -581,7 +581,7 @@ onMounted(fetchData)
   min-height: 52px;
   padding: 0 16px;
   box-sizing: border-box;
-  background: linear-gradient(180deg, var(--gray-0) 0%, var(--gray-10) 100%);
+  background: var(--gray-0);
   border-bottom: 1px solid var(--gray-100);
   flex-shrink: 0;
 }
@@ -614,9 +614,8 @@ onMounted(fetchData)
 }
 
 .panel-title-icon--accent {
-  background: linear-gradient(135deg, var(--main-color), var(--main-700));
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+  background: var(--main-color);
+  color: var(--gray-0);
 }
 
 .header-meta {

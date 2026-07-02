@@ -699,7 +699,7 @@ onMounted(fetchData)
   padding: 16px 20px;
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 .workflow-form__title {
@@ -818,12 +818,12 @@ onMounted(fetchData)
 
 .step-nav__item--current .step-nav__no {
   background: var(--main-color);
-  color: #fff;
+  color: var(--gray-0);
 }
 
 .step-nav__item--done .step-nav__no {
   background: var(--color-success-500);
-  color: #fff;
+  color: var(--gray-0);
 }
 
 .step-nav__body {
@@ -910,7 +910,7 @@ onMounted(fetchData)
   flex-direction: column;
   background: var(--gray-0);
   border: 1px solid var(--gray-150);
-  border-radius: 10px;
+  border-radius: 8px;
   overflow: hidden;
   flex: 1;
   min-height: 0;
@@ -923,7 +923,7 @@ onMounted(fetchData)
   gap: 12px;
   min-height: 56px;
   padding: 0 20px;
-  background: linear-gradient(180deg, var(--gray-0) 0%, var(--gray-10) 100%);
+  background: var(--gray-0);
   border-bottom: 1px solid var(--gray-100);
 }
 
@@ -980,9 +980,8 @@ onMounted(fetchData)
 }
 
 .panel-title-icon--accent {
-  background: linear-gradient(135deg, var(--main-color), var(--main-700));
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+  background: var(--main-color);
+  color: var(--gray-0);
 }
 
 .header-meta {
@@ -1287,7 +1286,7 @@ onMounted(fetchData)
   background: var(--color-success-50);
   color: var(--color-success-700);
   border: 1px solid var(--color-success-200);
-  border-radius: 4px;
+  border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
 }

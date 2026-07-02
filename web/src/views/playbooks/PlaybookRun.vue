@@ -259,6 +259,8 @@ function currentStepRendered() {
   )
 }
 
+import { copyToClipboard } from '@/utils/clipboard'
+
 async function copyCurrentStep() {
   const text = currentStepRendered()
   if (!text) {
@@ -266,7 +268,7 @@ async function copyCurrentStep() {
     return
   }
   try {
-    await navigator.clipboard.writeText(text)
+    await copyToClipboard(text)
     message.success('本步 prompt 已复制')
   } catch {
     message.error('复制失败,请手动复制')
@@ -277,7 +279,7 @@ async function openPlatformForCurrent(url) {
   const text = currentStepRendered()
   if (text) {
     try {
-      await navigator.clipboard.writeText(text)
+      await copyToClipboard(text)
       message.success('已复制本步 prompt,请到 AI 平台粘贴')
     } catch {
       message.warning('请手动复制后再打开 AI 平台')

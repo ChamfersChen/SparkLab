@@ -150,8 +150,10 @@ async function handleSaveNote(id) {
   }
 }
 
+import { copyToClipboard } from '@/utils/clipboard'
+
 function copyCode(code, id) {
-  navigator.clipboard.writeText(code)
+  copyToClipboard(code)
   copiedId.value = id
   message.success('已复制')
   setTimeout(() => { copiedId.value = null }, 2000)
@@ -159,7 +161,7 @@ function copyCode(code, id) {
 
 function copyLink(code, id) {
   const link = `${window.location.origin}/activate?code=${code}`
-  navigator.clipboard.writeText(link)
+  copyToClipboard(link)
   copiedId.value = id
   message.success('激活链接已复制')
   setTimeout(() => { copiedId.value = null }, 2000)

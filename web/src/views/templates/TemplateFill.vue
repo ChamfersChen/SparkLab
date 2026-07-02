@@ -204,10 +204,12 @@ function generatePrompt() {
   })
 }
 
+import { copyToClipboard } from '@/utils/clipboard'
+
 async function copyPrompt() {
   if (!generatedPrompt.value) return
   try {
-    await navigator.clipboard.writeText(generatedPrompt.value)
+    await copyToClipboard(generatedPrompt.value)
     message.success('已复制到剪贴板')
   } catch {
     message.error('复制失败,请手动复制')
@@ -217,7 +219,7 @@ async function copyPrompt() {
 async function openPlatform(url) {
   if (generatedPrompt.value) {
     try {
-      await navigator.clipboard.writeText(generatedPrompt.value)
+      await copyToClipboard(generatedPrompt.value)
       message.success('提示词已复制,请在 AI 平台中粘贴（Ctrl/⌘+V）')
     } catch {
       message.warning('请手动复制后再打开 AI 平台')

@@ -239,10 +239,12 @@ function renderTemplateRunHtml(text) {
   return md.render(text)
 }
 
+import { copyToClipboard } from '@/utils/clipboard'
+
 async function copyText(text, label) {
   if (!text) return
   try {
-    await navigator.clipboard.writeText(text)
+    await copyToClipboard(text)
     message.success(`${label}已复制到剪贴板`)
   } catch {
     message.error('复制失败,请手动复制')

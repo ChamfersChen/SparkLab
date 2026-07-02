@@ -24,6 +24,7 @@ import {
   ChevronRight,
   Copy,
   ExternalLink,
+  Heart,
   RefreshCcw,
   Sparkles,
   Wand2,
@@ -31,6 +32,7 @@ import {
 } from 'lucide-vue-next'
 import { getPlaybook, incrementUseCount } from '@/apis/playbook_api'
 import { createPlaybookRun } from '@/apis/playbook_runs_api'
+import { checkFavorited, toggleFavorite } from '@/apis/favorite_api'
 
 const route = useRoute()
 const router = useRouter()
@@ -44,6 +46,7 @@ const PLATFORMS = [
 
 const loading = ref(false)
 const playbook = ref(null)
+const isFavorited = ref(false)
 const workflowFormValues = ref({})
 const stepFormValues = ref({})
 const stepFilledPrompts = ref({})
@@ -155,6 +158,25 @@ function fillLocal(text, formValues, prevOutput) {
   return t
 }
 
+async function checkFavoriteStatus() {
+  if (!playbook.value) return
+  try {
+    const res = await checkFavorited('playbook', playbook.value.id)
+    isFavorited.value = res.favorited
+  } catch { /* 忽略 */ }
+}
+
+async function toggleFav() {
+  if (!playbook.value) return
+  try {
+    const res = await toggleFavorite('playbook', playbook.value.id)
+    isFavorited.value = res.favorited
+    message.success(res.favorited ? '已收藏' : '已取消收藏')
+  } catch {
+    message.error('操作失败')
+  }
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -174,6 +196,7 @@ async function fetchData() {
       }
     }
     loadDraft()
+    checkFavoriteStatus()
   } catch (e) {
     if (e?.response?.status !== 401) {
       message.error('工作流加载失败')
@@ -352,6 +375,14 @@ onMounted(fetchData)
               <h1 class="page-bar__title">{{ playbook.title }}</h1>
             </div>
             <div class="hero-progress">
+              <button
+                class="fav-btn"
+                :class="{ 'fav-btn--active': isFavorited }"
+                :title="isFavorited ? '取消收藏' : '收藏'"
+                @click="toggleFav"
+              >
+                <Heart :size="16" :fill="isFavorited ? 'currentColor' : 'none'" />
+              </button>
               <span class="progress-pill">
                 {{ totalSteps }} 个步骤
               </span>
@@ -1380,5 +1411,33 @@ onMounted(fetchData)
   .run-toolbar {
     padding: 12px 16px;
   }
+}
+
+/* 收藏按钮 */
+.fav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--gray-0);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.fav-btn:hover {
+  border-color: var(--main-color);
+  color: var(--main-color);
+  background: var(--main-10);
+}
+
+.fav-btn--active {
+  border-color: var(--main-color);
+  color: var(--main-color);
+  background: var(--main-10);
 }
 </style>

@@ -7,6 +7,7 @@
 
 from sparklab.models.activation_code import ActivationCode, ActivationCodeStatus
 from sparklab.models.base import Base, TimestampMixin
+from sparklab.models.favorite import Favorite, FavoriteTargetType
 from sparklab.models.playbook import (
     Playbook,
     PlaybookRun,
@@ -26,6 +27,8 @@ __all__ = [
     "UserRole",
     "ActivationCode",
     "ActivationCodeStatus",
+    "Favorite",
+    "FavoriteTargetType",
     "Tag",
     "TagCategory",
     "Template",

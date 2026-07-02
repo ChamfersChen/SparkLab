@@ -10,6 +10,7 @@ from fastapi import APIRouter
 from server.routers.activation_router import activation
 from server.routers.admin import admin_router
 from server.routers.auth_router import auth
+from server.routers.favorite_router import favorite
 from server.routers.playbook_router import playbook
 from server.routers.system_router import system
 from server.routers.tag_router import tag
@@ -32,6 +33,9 @@ router.include_router(template)  # /api/templates/*
 
 # 工作流
 router.include_router(playbook)  # /api/playbooks/*
+
+# 收藏
+router.include_router(favorite)  # /api/favorites/*
 
 # 管理后台
 router.include_router(admin_router)  # /api/admin/*

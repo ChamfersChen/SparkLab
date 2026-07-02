@@ -9,9 +9,10 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { ArrowRight, ChevronLeft, Clock, FileText, Sparkles } from 'lucide-vue-next'
+import { ArrowRight, ChevronLeft, Clock, FileText, Heart, Sparkles } from 'lucide-vue-next'
 import MarkdownIt from 'markdown-it'
 import { getTemplate } from '@/apis/template_api'
+import { checkFavorited, toggleFavorite } from '@/apis/favorite_api'
 import { extractVariables } from '@/composables/useTemplateVariables'
 
 const route = useRoute()
@@ -19,12 +20,33 @@ const router = useRouter()
 
 const loading = ref(false)
 const template = ref(null)
+const isFavorited = ref(false)
+
+async function checkFavoriteStatus() {
+  if (!template.value) return
+  try {
+    const res = await checkFavorited('template', template.value.id)
+    isFavorited.value = res.favorited
+  } catch { /* 忽略 */ }
+}
+
+async function toggleFav() {
+  if (!template.value) return
+  try {
+    const res = await toggleFavorite('template', template.value.id)
+    isFavorited.value = res.favorited
+    message.success(res.favorited ? '已收藏' : '已取消收藏')
+  } catch {
+    message.error('操作失败')
+  }
+}
 
 async function fetchData() {
   loading.value = true
   try {
     const res = await getTemplate(route.params.id)
     template.value = res
+    checkFavoriteStatus()
   } catch (e) {
     if (e.response?.status === 404) {
       message.error('模板已下架或不存在')
@@ -153,6 +175,14 @@ onMounted(fetchData)
               <h1 class="page-bar__title">{{ template.title }}</h1>
             </div>
             <div class="page-bar__right-meta">
+              <button
+                class="fav-btn"
+                :class="{ 'fav-btn--active': isFavorited }"
+                :title="isFavorited ? '取消收藏' : '收藏'"
+                @click="toggleFav"
+              >
+                <Heart :size="16" :fill="isFavorited ? 'currentColor' : 'none'" />
+              </button>
               <span
                 v-if="STATUS_LABEL[template.status]"
                 class="status-tag"
@@ -604,5 +634,32 @@ onMounted(fetchData)
   .page-footer {
     padding: 16px 16px 0;
   }
+}
+
+/* 收藏按钮 */
+.fav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--gray-0);
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fav-btn:hover {
+  border-color: var(--main-color);
+  color: var(--main-color);
+  background: var(--main-10);
+}
+
+.fav-btn--active {
+  border-color: var(--main-color);
+  color: var(--main-color);
+  background: var(--main-10);
 }
 </style>

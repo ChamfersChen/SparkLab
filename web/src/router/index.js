@@ -112,6 +112,12 @@ const routes = [
     meta: { title: '个人中心', layout: 'app' }
   },
   {
+    path: '/favorites',
+    name: 'favorites',
+    component: () => import('@/views/FavoritesView.vue'),
+    meta: { title: '我的收藏', layout: 'app' }
+  },
+  {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
     component: () => import('@/views/NotFoundView.vue'),

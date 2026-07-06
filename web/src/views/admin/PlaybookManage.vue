@@ -100,7 +100,7 @@ async function fetchData() {
     total.value = res.total
   } catch (e) {
     if (e.response?.status !== 401) {
-      message.error('获取工作流列表失败')
+      message.error('获取流程列表失败')
     }
   } finally {
     loading.value = false
@@ -123,7 +123,7 @@ async function changeStatus(id, status) {
   try {
     await adminChangeStatus(id, status)
     message.success(
-      `工作流已${status === 'published' ? '发布' : status === 'archived' ? '下线' : '设为草稿'}`,
+      `流程已${status === 'published' ? '发布' : status === 'archived' ? '下线' : '设为草稿'}`,
     )
     if (items.value.length === 1 && page.value > 1) {
       page.value -= 1
@@ -137,15 +137,15 @@ async function changeStatus(id, status) {
 function handleHardDelete(record) {
   let typedTitle = ''
   Modal.confirm({
-    title: `删除工作流「${record.title}」?`,
+    title: `删除流程「${record.title}」?`,
     content: () =>
       h('div', null, [
         h(
           'p',
           { style: 'margin-bottom: 8px; color: var(--gray-700);' },
-          '此操作将从数据库中彻底删除该工作流及其步骤关联，不可恢复。用户端将立即无法访问。',
+          '此操作将从数据库中彻底删除该流程及其步骤关联，不可恢复。用户端将立即无法访问。',
         ),
-        h('p', { style: 'margin-bottom: 4px;' }, '请输入工作流标题以确认：'),
+        h('p', { style: 'margin-bottom: 4px;' }, '请输入流程标题以确认：'),
         h('input', {
           value: '',
           placeholder: record.title,
@@ -166,7 +166,7 @@ function handleHardDelete(record) {
       }
       try {
         await adminHardDeletePlaybook(record.id)
-        message.success('工作流已删除')
+        message.success('流程已删除')
         if (items.value.length === 1 && page.value > 1) {
           page.value -= 1
         }
@@ -198,15 +198,15 @@ const tableLocale = computed(() => ({
       'h3',
       { class: 'empty-state__title' },
       search.value || statusFilter.value || selectedTagIds.value.length
-        ? '没有匹配的工作流'
-        : '暂无工作流',
+        ? '没有匹配的流程'
+        : '暂无流程',
     ),
     h(
       'p',
       { class: 'empty-state__desc' },
       search.value || statusFilter.value || selectedTagIds.value.length
         ? '试试调整搜索或筛选条件'
-        : '点击右上角「新建工作流」开始创建',
+        : '点击右上角「新建流程」开始创建',
     ),
   ]),
 }))
@@ -222,12 +222,12 @@ onMounted(() => {
     <div class="page-content">
       <header class="page-bar">
         <div class="page-bar__title-area">
-          <h1 class="page-bar__title">工作流管理</h1>
+          <h1 class="page-bar__title">流程管理</h1>
         </div>
         <div class="page-bar__actions">
           <a-button type="primary" @click="goCreate">
             <template #icon><Plus :size="16" /></template>
-            新建工作流
+            新建流程
           </a-button>
         </div>
       </header>
@@ -235,7 +235,7 @@ onMounted(() => {
       <div class="toolbar-card toolbar-card--compact">
         <a-input-search
           v-model:value="search"
-          placeholder="搜索工作流…"
+          placeholder="搜索流程…"
           allow-clear
           size="small"
           class="search-input"
@@ -376,7 +376,7 @@ onMounted(() => {
                 <a-tooltip
                   v-if="isSuperAdmin"
                   :title="record.status === 'published'
-                    ? '已发布的工作流不能删除,请先下线为「已归档」'
+                    ? '已发布的流程不能删除,请先下线为「已归档」'
                     : '物理删除：从数据库移除记录，不可恢复'"
                 >
                   <a-button

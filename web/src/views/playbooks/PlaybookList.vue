@@ -79,7 +79,7 @@ async function fetchData() {
     total.value = res.total
   } catch (e) {
     if (e.response?.status !== 401) {
-      message.error('获取工作流列表失败')
+      message.error('获取流程列表失败')
     }
   } finally {
     loading.value = false
@@ -181,7 +181,7 @@ onMounted(() => {
     <div class="page-content">
       <header class="page-bar">
         <div class="page-bar__title-area">
-          <h1 class="page-bar__title">工作流</h1>
+          <h1 class="page-bar__title">流程库</h1>
           <p class="page-bar__sub">按顺序完成各步提示词,走完流程拿到一套完整结果</p>
         </div>
       </header>
@@ -189,7 +189,7 @@ onMounted(() => {
       <div class="toolbar-card toolbar-card--compact">
         <a-input-search
           v-model:value="search"
-          placeholder="搜索工作流名称或描述…"
+          placeholder="搜索流程名称或描述…"
           allow-clear
           size="small"
           class="search-input"
@@ -238,7 +238,7 @@ onMounted(() => {
       </div>
 
       <div v-if="!loading" class="result-summary">
-        共 <strong>{{ total }}</strong> 个工作流
+        共 <strong>{{ total }}</strong> 个流程
         <span v-if="hasActiveFilter" class="filter-hint">（已应用筛选）</span>
       </div>
 
@@ -289,10 +289,10 @@ onMounted(() => {
               <FileSearch :size="28" />
             </div>
             <h3 class="empty-state__title">
-              {{ hasActiveFilter ? '没有找到匹配的工作流' : '暂无可用工作流' }}
+              {{ hasActiveFilter ? '没有找到匹配的流程' : '暂无可用流程' }}
             </h3>
             <p class="empty-state__desc">
-              {{ hasActiveFilter ? '试试调整筛选条件,或清除筛选后查看全部' : '管理员发布后,工作流会出现在这里' }}
+              {{ hasActiveFilter ? '试试调整筛选条件,或清除筛选后查看全部' : '管理员发布后,流程会出现在这里' }}
             </p>
             <a-button v-if="hasActiveFilter" type="primary" @click="clearAllFilters">
               清除筛选

@@ -2,7 +2,7 @@
 /**
  * 个人中心 (左右两栏布局).
  *
- * 左侧导航: 基础信息 / 模板使用记录 / 工作流使用记录
+ * 左侧导航: 基础信息 / 模板使用记录 / 流程使用记录
  * 右侧内容: 根据选中导航展示对应面板
  */
 import { computed, onMounted, ref, watch } from 'vue'
@@ -46,10 +46,10 @@ const currentTab = ref('basic')
 const navItems = [
   { key: 'basic', label: '基础信息', icon: Settings },
   { key: 'templates', label: '模板', icon: FileText },
-  { key: 'playbooks', label: '工作流', icon: LayoutGrid },
+  { key: 'playbooks', label: '流程', icon: LayoutGrid },
 ]
 
-/* ── 工作流运行记录 ── */
+/* ── 流程运行记录 ── */
 const runsLoading = ref(false)
 const runs = ref([])
 const total = ref(0)
@@ -409,11 +409,11 @@ function switchTab(key) {
             </a-spin>
           </section>
 
-          <!-- ====== 保存工作流 ====== -->
+          <!-- ====== 保存流程 ====== -->
           <section v-else class="card-block">
             <h2 class="section-title">
               <LayoutGrid :size="16" />
-              <span>保存工作流</span>
+              <span>保存流程</span>
               <span class="section-title__count" v-if="total > 0">共 {{ total }} 条</span>
             </h2>
 
@@ -424,10 +424,10 @@ function switchTab(key) {
                 </div>
                 <h3 class="empty-state__title">还没有保存记录</h3>
                 <p class="empty-state__desc">
-                  完成一个工作流后，点击「保存」，即可在「个人中心 - 工作流」查看保存结果。
+                  完成一个流程后，点击「保存」，即可在「个人中心 - 流程」查看保存结果。
                 </p>
                 <a-button type="primary" @click="$router.push({ name: 'playbooks' })">
-                  去工作流库
+                  去流程库
                 </a-button>
               </div>
 

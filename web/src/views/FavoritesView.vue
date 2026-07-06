@@ -1,6 +1,6 @@
 <script setup>
 /**
- * 我的收藏 — Tab 切换 (全部/模板/工作流) + 卡片列表
+ * 我的收藏 — Tab 切换 (全部/模板/流程) + 卡片列表
  */
 import { ref, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -20,12 +20,12 @@ const pageSize = ref(50)
 const TABS = [
   { key: 'all', label: '全部' },
   { key: 'template', label: '模板' },
-  { key: 'playbook', label: '工作流' },
+  { key: 'playbook', label: '流程' },
 ]
 
 const TYPE_META = {
   template: { label: '模板', icon: FileText, cls: 'fav-type--template' },
-  playbook: { label: '工作流', icon: BookOpen, cls: 'fav-type--playbook' },
+  playbook: { label: '流程', icon: BookOpen, cls: 'fav-type--playbook' },
 }
 
 async function fetchData() {
@@ -133,14 +133,14 @@ onMounted(fetchData)
             <Heart :size="28" />
           </div>
           <h3 class="empty-state__title">
-            {{ activeTab === 'all' ? '还没有收藏任何内容' : `还没有收藏${activeTab === 'template' ? '模板' : '工作流'}` }}
+            {{ activeTab === 'all' ? '还没有收藏任何内容' : `还没有收藏${activeTab === 'template' ? '模板' : '流程'}` }}
           </h3>
           <p class="empty-state__desc">
-            {{ activeTab === 'all' ? '去模板库或工作流看看' : `去${activeTab === 'template' ? '模板库' : '工作流'}看看` }}
+            {{ activeTab === 'all' ? '去模板库或流程库看看' : `去${activeTab === 'template' ? '模板库' : '流程库'}看看` }}
           </p>
           <a-button type="primary" @click="router.push(activeTab === 'playbook' ? '/playbooks' : '/templates')">
             <template #icon><FolderOpen :size="14" /></template>
-            {{ activeTab === 'playbook' ? '去工作流' : '去模板库' }}
+            {{ activeTab === 'playbook' ? '去流程库' : '去模板库' }}
           </a-button>
         </div>
       </a-spin>

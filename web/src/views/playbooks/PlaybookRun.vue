@@ -1,6 +1,6 @@
 <script setup>
 /**
- * 工作流运行页（用户端，v4 三栏布局）。
+ * 流程运行页（用户端，v4 三栏布局）。
  *
  * 流程：
  *   1. 进入页面：拉取 playbook 详情 + 顶部 +1 use_count
@@ -199,7 +199,7 @@ async function fetchData() {
     checkFavoriteStatus()
   } catch (e) {
     if (e?.response?.status !== 401) {
-      message.error('工作流加载失败')
+      message.error('流程加载失败')
     }
     router.replace({ name: 'playbooks' })
   } finally {
@@ -391,9 +391,9 @@ onMounted(fetchData)
 
           <p v-if="playbook.description" class="page-bar__sub page-bar__sub--fill">{{ playbook.description }}</p>
 
-          <!-- 工作流级参数(若 playbook.content 有 {{var}}) -->
+          <!-- 流程级参数(若 playbook.content 有 {{var}}) -->
           <section v-if="extractVariables(playbook.content || '').length" class="workflow-form card-block">
-            <h3 class="workflow-form__title">工作流参数</h3>
+            <h3 class="workflow-form__title">流程参数</h3>
             <div class="workflow-form__grid">
               <div
                 v-for="v in extractVariables(playbook.content || '')"
@@ -412,7 +412,7 @@ onMounted(fetchData)
               </div>
             </div>
             <div v-if="workflowMissingCount > 0" class="workflow-form__hint">
-              还有 {{ workflowMissingCount }} 个工作流参数未填
+              还有 {{ workflowMissingCount }} 个流程参数未填
             </div>
           </section>
 
@@ -604,7 +604,7 @@ onMounted(fetchData)
 
                 <div v-show="!summaryCollapsed" class="panel-body panel-body--summary">
                   <p class="summary-hint">
-                    走完工作流后, 把最终结论写在这里。<strong>支持 Markdown</strong>。保存时会与每步补充后的 prompt 一起存入个人中心。
+                    走完流程后, 把最终结论写在这里。<strong>支持 Markdown</strong>。保存时会与每步补充后的 prompt 一起存入个人中心。
                   </p>
                   <a-form layout="vertical">
                     <a-form-item label="运行标题（可选, 留空自动生成）">
@@ -620,7 +620,7 @@ onMounted(fetchData)
                         v-model:value="summaryFinalContent"
                         :rows="18"
                         :auto-size="{ minRows: 12, maxRows: 30 }"
-                        placeholder="把工作流跑完后的最终结论写在这里。例如:
+                        placeholder="把流程跑完后的最终结论写在这里。例如:
 
 # 产品定位
 - 目标人群: 25-35 岁都市女性
@@ -641,7 +641,7 @@ onMounted(fetchData)
                     </a-button>
                     <span v-if="summarySaved" class="summary-saved-tag">✓ 已保存</span>
                     <span v-else class="summary-saved-tip">
-                      可随时保存 — 不会打断你的编辑. 可在「个人中心 - 工作流」查看
+                      可随时保存 — 不会打断你的编辑. 可在「个人中心 - 流程」查看
                     </span>
                   </div>
                 </div>
@@ -726,7 +726,7 @@ onMounted(fetchData)
   font-weight: 500;
 }
 
-/* 工作流级参数卡片 */
+/* 流程级参数卡片 */
 .workflow-form {
   margin: 0 24px 16px;
   padding: 16px 20px;

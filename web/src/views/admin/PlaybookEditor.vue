@@ -1,6 +1,6 @@
 <script setup>
 /**
- * 工作流编辑器（新建/编辑）。
+ * 流程编辑器（新建/编辑）。
  *
  * 步骤不再关联已发布模板 — 每个步骤自带 content (Markdown + {{var}} + {{prev_output}})。
  * 步骤可上下移动、删除、新增,每步有独立编辑/预览切换与变量识别。
@@ -135,7 +135,7 @@ async function fetchPlaybook() {
     })
     onContentChange()
   } catch {
-    message.error('获取工作流信息失败')
+    message.error('获取流程信息失败')
     router.replace({ name: 'admin-playbooks' })
   } finally {
     loading.value = false
@@ -172,9 +172,9 @@ function reindexSteps() {
 }
 
 async function handleSave(publish = false) {
-  if (!form.value.title.trim()) { message.warning('请输入工作流标题'); return }
-  if (!form.value.description.trim()) { message.warning('请输入工作流描述'); return }
-  if (!form.value.content.trim()) { message.warning('请输入工作流 Prompt 内容'); return }
+  if (!form.value.title.trim()) { message.warning('请输入流程标题'); return }
+  if (!form.value.description.trim()) { message.warning('请输入流程描述'); return }
+  if (!form.value.content.trim()) { message.warning('请输入流程 Prompt 内容'); return }
   if (form.value.steps.length === 0) { message.warning('请至少添加 1 个步骤'); return }
   // 每步必须填写步骤名 + 步骤内容
   for (let i = 0; i < form.value.steps.length; i++) {
@@ -255,7 +255,7 @@ onMounted(async () => {
           <ChevronLeft :size="16" />
           <span>返回</span>
         </button>
-        <h1 class="page-bar__title">{{ isEdit ? '编辑工作流' : '新建工作流' }}</h1>
+        <h1 class="page-bar__title">{{ isEdit ? '编辑流程' : '新建流程' }}</h1>
       </header>
 
       <a-spin :spinning="loading">
@@ -264,19 +264,19 @@ onMounted(async () => {
           <section class="card-block">
             <h2 class="section-title">基础信息</h2>
             <a-form layout="vertical">
-              <a-form-item label="工作流标题" required>
+              <a-form-item label="流程标题" required>
                 <a-input v-model:value="form.title" placeholder="如「小红书爆款笔记流水线」" maxlength="200" show-count />
               </a-form-item>
               <a-form-item label="一句话描述" required>
-                <a-input v-model:value="form.description" placeholder="告诉用户这个工作流是做什么的" maxlength="500" show-count />
+                <a-input v-model:value="form.description" placeholder="告诉用户这个流程是做什么的" maxlength="500" show-count />
               </a-form-item>
             </a-form>
           </section>
 
-          <!-- 工作流 Prompt 内容 -->
+          <!-- 流程 Prompt 内容 -->
           <section class="card-block">
             <div class="section-header">
-              <h2 class="section-title">工作流 Prompt（Markdown）</h2>
+              <h2 class="section-title">流程 Prompt（Markdown）</h2>
               <div class="mode-switch">
                 <button
                   type="button"
@@ -309,8 +309,8 @@ onMounted(async () => {
                 :auto-size="{ minRows: 10, maxRows: 30 }"
                 placeholder="例如：
 
-# 工作流说明
-本工作流将引导你一步步完成一篇小红书爆款笔记的创作。
+# 流程说明
+本流程将引导你一步步完成一篇小红书爆款笔记的创作。
 
 # 步骤预告
 1. 先分析产品定位
@@ -332,7 +332,7 @@ onMounted(async () => {
               <span v-for="v in extractedVars" :key="v" class="var-chip">{{ v }}</span>
             </div>
             <div v-else-if="form.content" class="no-vars-hint">
-              当前内容未包含 <code>{`{{变量名}}`}</code>,工作流将无变量可填
+              当前内容未包含 <code>{`{{变量名}}`}</code>,流程将无变量可填
             </div>
           </section>
 
@@ -457,7 +457,7 @@ onMounted(async () => {
           <!-- 标签 -->
           <section class="card-block">
             <h2 class="section-title">标签</h2>
-            <p class="section-hint">添加标签后,用户可在工作流列表中按标签筛选。</p>
+            <p class="section-hint">添加标签后,用户可在流程列表中按标签筛选。</p>
             <div v-for="(tagList, category) in tags" :key="category" class="filter-group">
               <span class="filter-label">{{ { platform: '平台', content_type: '内容类型', industry: '行业/场景' }[category] }}</span>
               <div class="filter-tags">

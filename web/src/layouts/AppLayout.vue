@@ -3,8 +3,8 @@
  * 应用主布局 - 左侧固定导航 + 右侧自适应内容区。
  *
  * 导航层级（按产品文档 §2）：
- *   用户端：首页 / 模板库 / 工作流 / 资讯 / 我的收藏 / 个人中心
- *   管理后台（管理员可见）：模板管理 / 工作流管理 / 资讯管理 / 标签管理 / 数据看板
+ *   用户端：首页 / 模板库 / 流程库 / 资讯 / 我的收藏 / 个人中心
+ *   管理后台（管理员可见）：模板管理 / 流程管理 / 资讯管理 / 标签管理 / 数据看板
  *   仅超管：激活码管理 / 管理员账号 / AI 平台配置
  *
  * 底部：用户信息 + 退出登录。
@@ -49,7 +49,7 @@ function closeDrawer() {
 const userNavItems = [
   // { name: '首页', path: '/templates', icon: LayoutDashboard },
   { name: '模板库', path: '/templates', icon: FileText },
-  { name: '工作流', path: '/playbooks', icon: BookOpen },
+  { name: '流程库', path: '/playbooks', icon: BookOpen },
   { name: '资讯', path: '/news', icon: Newspaper },
   { name: '我的收藏', path: '/favorites', icon: Heart },
   { name: '个人中心', path: '/profile', icon: User },
@@ -59,7 +59,7 @@ const userNavItems = [
 const adminNavItems = computed(() => {
   const items = [
     { name: '模板管理', path: '/admin/templates', icon: FileText },
-    { name: '工作流管理', path: '/admin/playbooks', icon: BookOpen },
+    { name: '流程管理', path: '/admin/playbooks', icon: BookOpen },
     { name: '资讯管理', path: '/admin/news', icon: Newspaper },
     { name: '数据看板', path: '/admin/dashboard', icon: BarChart3 },
   ]

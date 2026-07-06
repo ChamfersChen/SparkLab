@@ -1,4 +1,3 @@
-
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
@@ -70,6 +69,12 @@ const routes = [
     meta: { title: '新建模板', layout: 'app' }
   },
   {
+    path: '/admin/dashboard',
+    name: 'admin-dashboard',
+    component: () => import('@/views/admin/AdminDashboardView.vue'),
+    meta: { title: '数据看板', layout: 'app' }
+  },
+  {
     path: '/admin/templates/:id/edit',
     name: 'admin-template-edit',
     component: () => import('@/views/admin/TemplateEditor.vue'),
@@ -79,31 +84,31 @@ const routes = [
     path: '/playbooks',
     name: 'playbooks',
     component: () => import('@/views/playbooks/PlaybookList.vue'),
-    meta: { title: '工作流', layout: 'app' }
+    meta: { title: '流程库', layout: 'app' }
   },
   {
     path: '/playbooks/:id',
     name: 'playbook-run',
     component: () => import('@/views/playbooks/PlaybookRun.vue'),
-    meta: { title: '工作流运行', layout: 'app' }
+    meta: { title: '流程运行', layout: 'app' }
   },
   {
     path: '/admin/playbooks',
     name: 'admin-playbooks',
     component: () => import('@/views/admin/PlaybookManage.vue'),
-    meta: { title: '工作流管理', layout: 'app' }
+    meta: { title: '流程管理', layout: 'app' }
   },
   {
     path: '/admin/playbooks/create',
     name: 'admin-playbook-create',
     component: () => import('@/views/admin/PlaybookEditor.vue'),
-    meta: { title: '新建工作流', layout: 'app' }
+    meta: { title: '新建流程', layout: 'app' }
   },
   {
     path: '/admin/playbooks/:id/edit',
     name: 'admin-playbook-edit',
     component: () => import('@/views/admin/PlaybookEditor.vue'),
-    meta: { title: '编辑工作流', layout: 'app' }
+    meta: { title: '编辑流程', layout: 'app' }
   },
   {
     path: '/profile',
@@ -139,4 +144,3 @@ router.beforeEach((to) => {
 })
 
 export default router
-

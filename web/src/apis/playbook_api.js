@@ -1,7 +1,7 @@
 import { apiGet, apiPost, apiAdminGet, apiAdminPost, apiAdminPut, apiAdminDelete, apiSuperAdminDelete } from './base'
 
 /**
- * 工作流 API。
+ * 流程 API。
  *
  * 命名约定:用户端不带前缀(playbook),管理端带 admin 前缀(adminPlaybook)。
  * 路径以 /playbooks 为基础。

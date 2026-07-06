@@ -307,7 +307,7 @@ onMounted(() => {
           v-model:page-size="pageSize"
           :total="total"
           show-size-changer
-          show-total="total => `共 ${total} 条`"
+          :show-total="(t) => `共 ${t} 条`"
           @change="onPageChange"
         />
       </div>

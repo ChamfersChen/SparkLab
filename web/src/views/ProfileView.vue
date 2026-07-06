@@ -402,7 +402,7 @@ function switchTab(key) {
                   v-model:current="templatePage"
                   :total="templateTotal"
                   :page-size="templatePageSize"
-                  show-total="total => `共 ${total} 条`"
+                  :show-total="(t) => `共 ${t} 条`"
                   @change="onTemplatePageChange"
                 />
               </div>
@@ -472,7 +472,7 @@ function switchTab(key) {
                   v-model:current="page"
                   :total="total"
                   :page-size="pageSize"
-                  show-total="total => `共 ${total} 条`"
+                  :show-total="(t) => `共 ${t} 条`"
                   @change="onPageChange"
                 />
               </div>

@@ -26,7 +26,12 @@ class Favorite(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     target_type: Mapped[FavoriteTargetType] = mapped_column(
-        Enum(FavoriteTargetType, name="favorite_target_type", create_constraint=True),
+        Enum(
+            FavoriteTargetType,
+            name="favorite_target_type",
+            create_constraint=False,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
         nullable=False,
     )
     target_id: Mapped[int] = mapped_column(Integer, nullable=False)

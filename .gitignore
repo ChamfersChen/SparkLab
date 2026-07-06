@@ -14,6 +14,7 @@ __pycache__/
 ### Vue gitignore
 dist
 node_modules
+.eslintcache
 
 ### common gitignore
 .DS_Store

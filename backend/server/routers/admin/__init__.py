@@ -8,6 +8,7 @@ from fastapi import APIRouter
 
 from server.routers.admin.activation_code_admin_router import activation_code_admin
 from server.routers.admin.admin_account_router import admin_account
+from server.routers.admin.dashboard_admin_router import dashboard_admin
 from server.routers.admin.playbook_admin_router import playbook_admin
 from server.routers.admin.tag_admin_router import tag_admin
 from server.routers.admin.template_admin_router import template_admin
@@ -18,4 +19,5 @@ admin_router.include_router(tag_admin)
 admin_router.include_router(template_admin)
 admin_router.include_router(playbook_admin)
 admin_router.include_router(admin_account)
+admin_router.include_router(dashboard_admin)
 

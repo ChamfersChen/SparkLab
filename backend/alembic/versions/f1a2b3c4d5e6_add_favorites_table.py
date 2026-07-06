@@ -27,10 +27,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # 创建枚举类型
-    favorite_target_type = sa.Enum('template', 'playbook', name='favorite_target_type')
-    favorite_target_type.create(op.get_bind(), checkfirst=True)
-
     op.create_table(
         'favorites',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),

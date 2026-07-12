@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiAdminGet, apiAdminPost, apiAdminPut, apiAdminDelete } from './base'
+import { apiGet, apiPost, apiPut, apiDelete, apiAdminGet, apiAdminPost, apiAdminPut, apiAdminDelete } from './base'
 
 /**
  * 用户端模板 API
@@ -17,6 +17,29 @@ export function getFillData(id) {
 
 export function incrementUseCount(id) {
   return apiPost(`/templates/${id}/use`)
+}
+
+/**
+ * 我的模板 API（普通用户管理自己创建的模板）
+ */
+export function myListTemplates(params = {}) {
+  return apiGet('/my/templates', params)
+}
+
+export function myGetTemplate(id) {
+  return apiGet(`/my/templates/${id}`)
+}
+
+export function myCreateTemplate(data) {
+  return apiPost('/my/templates', data)
+}
+
+export function myUpdateTemplate(id, data) {
+  return apiPut(`/my/templates/${id}`, data)
+}
+
+export function myDeleteTemplate(id) {
+  return apiDelete(`/my/templates/${id}`)
 }
 
 /**

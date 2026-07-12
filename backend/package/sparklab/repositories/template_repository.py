@@ -30,9 +30,21 @@ class TemplateRepository:
         offset: int = 0,
         limit: int = 20,
         sort_by: str = "use_count",
+        include_private: bool = False,
     ) -> tuple[list[Template], int]:
+        """查询模板列表。
+
+        Args:
+            include_private: 是否包含私有模板。管理员查看时设为 True，
+                           普通用户查看公开模板时设为 False（默认）。
+        """
         query = select(Template).options(selectinload(Template.tags))
         count_query = select(func.count(Template.id))
+
+        # 默认排除私有模板（除非明确包含）
+        if not include_private:
+            query = query.where(Template.is_private == False)  # noqa: E712
+            count_query = count_query.where(Template.is_private == False)  # noqa: E712
 
         # 搜索
         if search:
@@ -79,6 +91,53 @@ class TemplateRepository:
         items = list(result.scalars().all())
         return items, total
 
+    async def list_by_user(
+        self,
+        user_id: int,
+        *,
+        search: str | None = None,
+        status: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        sort_by: str = "newest",
+    ) -> tuple[list[Template], int]:
+        """查询用户自己的模板列表（包含私有和公开的）。"""
+        query = select(Template).options(selectinload(Template.tags))
+        count_query = select(func.count(Template.id))
+
+        # 只查当前用户的模板
+        query = query.where(Template.creator_id == user_id)
+        count_query = count_query.where(Template.creator_id == user_id)
+
+        # 搜索
+        if search:
+            pattern = f"%{search}%"
+            query = query.where(
+                Template.title.ilike(pattern) | Template.description.ilike(pattern)
+            )
+            count_query = count_query.where(
+                Template.title.ilike(pattern) | Template.description.ilike(pattern)
+            )
+
+        # 状态筛选
+        if status:
+            query = query.where(Template.status == status)
+            count_query = count_query.where(Template.status == status)
+
+        # 排序
+        if sort_by == "newest":
+            query = query.order_by(Template.created_at.desc())
+        else:
+            query = query.order_by(Template.use_count.desc(), Template.created_at.desc())
+
+        total_result = await self.db.execute(count_query)
+        total = total_result.scalar() or 0
+
+        query = query.offset(offset).limit(limit)
+        result = await self.db.execute(query)
+        items = list(result.scalars().all())
+        return items, total
+
     async def create(
         self,
         title: str,
@@ -88,6 +147,7 @@ class TemplateRepository:
         status: str = "draft",
         creator_id: int | None = None,
         tag_ids: list[int] | None = None,
+        is_private: bool = False,
     ) -> Template:
         template = Template(
             title=title,
@@ -96,6 +156,7 @@ class TemplateRepository:
             variable_hints=json.dumps(variable_hints, ensure_ascii=False) if variable_hints else None,
             status=TemplateStatus(status),
             creator_id=creator_id,
+            is_private=is_private,
         )
         self.db.add(template)
         await self.db.flush()

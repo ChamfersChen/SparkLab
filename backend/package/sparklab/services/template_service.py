@@ -66,10 +66,36 @@ class TemplateService:
         page: int = 1,
         page_size: int = 20,
         sort_by: str = "use_count",
+        include_private: bool = False,
     ) -> tuple[list, int]:
+        """查询模板列表。
+
+        Args:
+            include_private: 是否包含私有模板。管理员查看时设为 True。
+        """
         return await self.repo.list_all(
             search=search,
             tag_id_groups=tag_id_groups,
+            status=status,
+            offset=(page - 1) * page_size,
+            limit=page_size,
+            sort_by=sort_by,
+            include_private=include_private,
+        )
+
+    async def list_user_templates(
+        self,
+        user_id: int,
+        search: str | None = None,
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "newest",
+    ) -> tuple[list, int]:
+        """查询用户自己的模板列表（包含私有和公开的）。"""
+        return await self.repo.list_by_user(
+            user_id=user_id,
+            search=search,
             status=status,
             offset=(page - 1) * page_size,
             limit=page_size,
@@ -84,9 +110,9 @@ class TemplateService:
     ) -> Template | None:
         """按作者可见性获取模板。
 
-        - published: 任何登录用户可见
+        - published 且非私有: 任何登录用户可见
+        - 私有模板: 仅 creator 可见
         - draft / archived: 仅 creator 可见
-        - 未登录用户仅能看 published
         - 不存在或不满足可见性 → 返回 None(路由层转 404)
         """
         template = await self.get_template(template_id)
@@ -97,6 +123,12 @@ class TemplateService:
             if hasattr(template.status, "value")
             else template.status
         )
+        # 私有模板：仅创建者可见
+        if template.is_private:
+            if user_id is not None and template.creator_id == user_id:
+                return template
+            return None
+        # 公开模板：published 状态任何用户可见，其他状态仅创建者可见
         if status_value == "published":
             return template
         if user_id is not None and template.creator_id == user_id:
@@ -112,6 +144,7 @@ class TemplateService:
         variable_hints: dict | None = None,
         tag_ids: list[int] | None = None,
         status: str = "draft",
+        is_private: bool = False,
     ):
         await self._validate_tag_ids(tag_ids)
         self._validate_variable_hints_coverage(content, variable_hints)
@@ -123,6 +156,7 @@ class TemplateService:
             status=status,
             creator_id=creator_id,
             tag_ids=tag_ids,
+            is_private=is_private,
         )
         await self.db.commit()
         return await self.get_template(template.id)

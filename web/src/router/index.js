@@ -93,6 +93,54 @@ const routes = [
     meta: { title: '流程运行', layout: 'app' }
   },
   {
+    path: '/my-templates',
+    name: 'my-templates',
+    component: () => import('@/views/my/MyTemplatesView.vue'),
+    meta: { title: '我的模板', layout: 'app' }
+  },
+  {
+    path: '/my-templates/create',
+    name: 'my-template-create',
+    component: () => import('@/views/my/MyTemplateEditor.vue'),
+    meta: { title: '新建模板', layout: 'app' }
+  },
+  {
+    path: '/my-templates/:id',
+    name: 'my-template-detail',
+    component: () => import('@/views/my/MyTemplateDetail.vue'),
+    meta: { title: '模板详情', layout: 'app' }
+  },
+  {
+    path: '/my-templates/:id/edit',
+    name: 'my-template-edit',
+    component: () => import('@/views/my/MyTemplateEditor.vue'),
+    meta: { title: '编辑模板', layout: 'app' }
+  },
+  {
+    path: '/my-playbooks',
+    name: 'my-playbooks',
+    component: () => import('@/views/my/MyPlaybooksView.vue'),
+    meta: { title: '我的流程', layout: 'app' }
+  },
+  {
+    path: '/my-playbooks/create',
+    name: 'my-playbook-create',
+    component: () => import('@/views/my/MyPlaybookEditor.vue'),
+    meta: { title: '新建流程', layout: 'app' }
+  },
+  {
+    path: '/my-playbooks/:id',
+    name: 'my-playbook-detail',
+    component: () => import('@/views/my/MyPlaybookDetail.vue'),
+    meta: { title: '流程详情', layout: 'app' }
+  },
+  {
+    path: '/my-playbooks/:id/edit',
+    name: 'my-playbook-edit',
+    component: () => import('@/views/my/MyPlaybookEditor.vue'),
+    meta: { title: '编辑流程', layout: 'app' }
+  },
+  {
     path: '/admin/playbooks',
     name: 'admin-playbooks',
     component: () => import('@/views/admin/PlaybookManage.vue'),

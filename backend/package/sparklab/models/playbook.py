@@ -8,6 +8,7 @@
 import enum
 
 from sqlalchemy import (
+    Boolean,
     Enum,
     ForeignKey,
     Integer,
@@ -83,6 +84,8 @@ class Playbook(Base, TimestampMixin):
     creator_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # 是否为私有流程（普通用户创建为私有，管理员创建为公开）
+    is_private: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     # 关联
     steps: Mapped[list["PlaybookStep"]] = relationship(

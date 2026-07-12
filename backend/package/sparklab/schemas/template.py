@@ -32,6 +32,7 @@ class TemplateResponse(BaseModel):
     status: str
     use_count: int
     creator_id: int | None = None
+    is_private: bool = False
     tags: list[TagInfo] = []
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -67,6 +68,7 @@ class TemplateCreateRequest(BaseModel):
     variable_hints: dict[str, str] | None = None
     tag_ids: list[int] = []
     status: TemplateStatusLiteral = "draft"
+    is_private: bool = False
 
 
 class TemplateUpdateRequest(BaseModel):

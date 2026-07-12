@@ -47,7 +47,7 @@ async def list_templates(
     sort_by: str = Query("newest", description="排序：use_count / newest"),
     service: TemplateService = Depends(_get_service),
 ):
-    """管理员模板列表（包含所有状态）。"""
+    """管理员模板列表（仅公开模板，不包含普通用户私有模板）。"""
     items, total = await service.list_templates(
         search=search,
         tag_id_groups=_parse_tag_id_groups(tag_ids),
@@ -55,6 +55,7 @@ async def list_templates(
         page=page,
         page_size=page_size,
         sort_by=sort_by,
+        include_private=False,  # 管理员不查看普通用户的私有模板
     )
     return TemplateListResponse(
         items=[TemplateResponse.model_validate(t) for t in items],

@@ -260,7 +260,11 @@ function formatTime(ts) {
 }
 
 function goBack() {
-  router.push({ name: 'template-detail', params: { id: route.params.id } })
+  if (route.query.from === 'my') {
+    router.push({ name: 'my-template-detail', params: { id: route.params.id } })
+  } else {
+    router.push({ name: 'template-detail', params: { id: route.params.id } })
+  }
 }
 
 onMounted(fetchData)

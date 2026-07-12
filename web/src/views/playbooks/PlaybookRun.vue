@@ -201,7 +201,11 @@ async function fetchData() {
     if (e?.response?.status !== 401) {
       message.error('流程加载失败')
     }
-    router.replace({ name: 'playbooks' })
+    if (route.query.from === 'my') {
+      router.replace({ name: 'my-playbooks' })
+    } else {
+      router.replace({ name: 'playbooks' })
+    }
   } finally {
     loading.value = false
   }
@@ -355,7 +359,11 @@ async function confirmSaveSummary() {
 }
 
 function goBack() {
-  router.push({ name: 'playbooks' })
+  if (route.query.from === 'my') {
+    router.push({ name: 'my-playbook-detail', params: { id: route.params.id } })
+  } else {
+    router.push({ name: 'playbooks' })
+  }
 }
 
 onMounted(fetchData)

@@ -8,6 +8,7 @@
 import enum
 
 from sqlalchemy import (
+    Boolean,
     Enum,
     ForeignKey,
     Integer,
@@ -60,6 +61,8 @@ class Template(Base, TimestampMixin):
     creator_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+    # 是否为私有模板（普通用户创建为私有，管理员创建为公开）
+    is_private: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     # 关联
     tags: Mapped[list["Tag"]] = relationship(  # noqa: F821

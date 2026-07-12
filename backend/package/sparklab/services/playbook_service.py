@@ -177,10 +177,36 @@ class PlaybookService:
         page: int = 1,
         page_size: int = 20,
         sort_by: str = "use_count",
+        include_private: bool = False,
     ) -> tuple[list, int]:
+        """查询流程列表。
+
+        Args:
+            include_private: 是否包含私有流程。管理员查看时设为 True。
+        """
         return await self.repo.list_all(
             search=search,
             tag_id_groups=tag_id_groups,
+            status=status,
+            offset=(page - 1) * page_size,
+            limit=page_size,
+            sort_by=sort_by,
+            include_private=include_private,
+        )
+
+    async def list_user_playbooks(
+        self,
+        user_id: int,
+        search: str | None = None,
+        status: str | None = None,
+        page: int = 1,
+        page_size: int = 20,
+        sort_by: str = "newest",
+    ) -> tuple[list, int]:
+        """查询用户自己的流程列表（包含私有和公开的）。"""
+        return await self.repo.list_by_user(
+            user_id=user_id,
+            search=search,
             status=status,
             offset=(page - 1) * page_size,
             limit=page_size,
@@ -193,9 +219,10 @@ class PlaybookService:
     async def get_playbook_for_user(
         self, playbook_id: int, user
     ) -> Playbook | None:
-        """可见性规则同 Template:
-          - published: 任何登录用户
-          - draft / archived: 仅 creator 或 admin / super_admin
+        """可见性规则:
+          - 私有流程: 仅 creator 可见
+          - 公开流程 published: 任何登录用户
+          - 公开流程 draft / archived: 仅 creator 或 admin / super_admin
         """
         playbook = await self.get_playbook(playbook_id)
         if playbook is None:
@@ -203,6 +230,12 @@ class PlaybookService:
         status_value = (
             playbook.status.value if hasattr(playbook.status, "value") else playbook.status
         )
+        # 私有流程：仅创建者可见
+        if playbook.is_private:
+            if user is not None and getattr(user, "id", None) == playbook.creator_id:
+                return playbook
+            return None
+        # 公开流程：按状态判断
         if status_value == "published":
             return playbook
         if user is not None:
@@ -228,6 +261,7 @@ class PlaybookService:
         tag_ids: list[int] | None,
         status: str,
         creator_id: int | None,
+        is_private: bool = False,
     ) -> Playbook:
         await self._validate_tag_ids(tag_ids)
         self._validate_variable_hints_coverage(content, variable_hints)
@@ -250,6 +284,7 @@ class PlaybookService:
             status=status,
             creator_id=creator_id,
             tag_ids=tag_ids,
+            is_private=is_private,
         )
         await self.db.commit()
         return await self.get_playbook(playbook.id)

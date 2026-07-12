@@ -92,3 +92,5 @@ run.sh
 *.tar
 *.zip
 *.tar.gz
+
+assets/

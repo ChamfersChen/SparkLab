@@ -53,22 +53,36 @@ class DashboardRepository:
 
     async def count_templates_published(self) -> int:
         result = await self.db.execute(
-            select(func.count(Template.id)).where(Template.status == TemplateStatus.PUBLISHED)
+            select(func.count(Template.id)).where(
+                Template.status == TemplateStatus.PUBLISHED,
+                Template.is_private.is_(False),
+            )
         )
         return result.scalar() or 0
 
     async def count_playbooks_published(self) -> int:
         result = await self.db.execute(
-            select(func.count(Playbook.id)).where(Playbook.status == PlaybookStatus.PUBLISHED)
+            select(func.count(Playbook.id)).where(
+                Playbook.status == PlaybookStatus.PUBLISHED,
+                Playbook.is_private.is_(False),
+            )
         )
         return result.scalar() or 0
 
     async def sum_templates_use_count(self) -> int:
-        result = await self.db.execute(select(func.coalesce(func.sum(Template.use_count), 0)))
+        result = await self.db.execute(
+            select(func.coalesce(func.sum(Template.use_count), 0)).where(
+                Template.is_private.is_(False),
+            )
+        )
         return int(result.scalar() or 0)
 
     async def sum_playbooks_use_count(self) -> int:
-        result = await self.db.execute(select(func.coalesce(func.sum(Playbook.use_count), 0)))
+        result = await self.db.execute(
+            select(func.coalesce(func.sum(Playbook.use_count), 0)).where(
+                Playbook.is_private.is_(False),
+            )
+        )
         return int(result.scalar() or 0)
 
     async def count_runs_in_range(self, since: datetime) -> int:
@@ -155,17 +169,18 @@ class DashboardRepository:
     # ------------------------------------------------------------------
 
     async def top_templates_all(self, limit: int) -> list[Template]:
-        """累计 Top N：按 templates.use_count 排序。"""
+        """累计 Top N：按 templates.use_count 排序（排除私有模板）。"""
         result = await self.db.execute(
             select(Template)
             .options(selectinload(Template.tags))
+            .where(Template.is_private.is_(False))
             .order_by(Template.use_count.desc(), Template.created_at.desc())
             .limit(limit)
         )
         return list(result.scalars().all())
 
     async def top_templates_in_range(self, since: datetime, limit: int) -> list[tuple[Template, int]]:
-        """区间内 Top N：按 template_runs 行数排序。返回 (template, runs_count)。"""
+        """区间内 Top N：按 template_runs 行数排序（排除私有模板）。返回 (template, runs_count)。"""
         runs_subq = (
             select(
                 TemplateRun.template_id.label("tid"),
@@ -179,21 +194,25 @@ class DashboardRepository:
             select(Template, runs_subq.c.runs)
             .options(selectinload(Template.tags))
             .join(runs_subq, Template.id == runs_subq.c.tid)
+            .where(Template.is_private.is_(False))
             .order_by(runs_subq.c.runs.desc(), Template.created_at.desc())
             .limit(limit)
         )
         return [(row[0], int(row[1] or 0)) for row in result.all()]
 
     async def top_playbooks_all(self, limit: int) -> list[Playbook]:
+        """累计 Top N：按 playbooks.use_count 排序（排除私有流程）。"""
         result = await self.db.execute(
             select(Playbook)
             .options(selectinload(Playbook.tags), selectinload(Playbook.steps))
+            .where(Playbook.is_private.is_(False))
             .order_by(Playbook.use_count.desc(), Playbook.created_at.desc())
             .limit(limit)
         )
         return list(result.scalars().all())
 
     async def top_playbooks_in_range(self, since: datetime, limit: int) -> list[tuple[Playbook, int]]:
+        """区间内 Top N：按 playbook_runs 行数排序（排除私有流程）。返回 (playbook, runs_count)。"""
         runs_subq = (
             select(
                 PlaybookRun.playbook_id.label("pid"),
@@ -207,6 +226,7 @@ class DashboardRepository:
             select(Playbook, runs_subq.c.runs)
             .options(selectinload(Playbook.tags), selectinload(Playbook.steps))
             .join(runs_subq, Playbook.id == runs_subq.c.pid)
+            .where(Playbook.is_private.is_(False))
             .order_by(runs_subq.c.runs.desc(), Playbook.created_at.desc())
             .limit(limit)
         )
@@ -230,7 +250,10 @@ class DashboardRepository:
             Template.status.cast(String).label("status"),
             Template.creator_id.label("creator_id"),
             Template.updated_at.label("activity_at"),
-        ).where(Template.status == TemplateStatus.PUBLISHED)
+        ).where(
+            Template.status == TemplateStatus.PUBLISHED,
+            Template.is_private.is_(False),
+        )
         pb_q = select(
             literal_column("'playbook'").label("type"),
             Playbook.id.label("id"),
@@ -238,7 +261,10 @@ class DashboardRepository:
             Playbook.status.cast(String).label("status"),
             Playbook.creator_id.label("creator_id"),
             Playbook.updated_at.label("activity_at"),
-        ).where(Playbook.status == PlaybookStatus.PUBLISHED)
+        ).where(
+            Playbook.status == PlaybookStatus.PUBLISHED,
+            Playbook.is_private.is_(False),
+        )
         union_q = tpl_q.union_all(pb_q).subquery()
         result = await self.db.execute(select(union_q).order_by(union_q.c.activity_at.desc()).limit(limit))
         rows = []

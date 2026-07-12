@@ -55,6 +55,7 @@ class PlaybookResponse(BaseModel):
     status: str
     use_count: int
     creator_id: int | None = None
+    is_private: bool = False
     steps: list[PlaybookStepItem] = []
     tags: list[TagInfo] = []
     created_at: datetime | None = None
@@ -93,6 +94,7 @@ class PlaybookCreateRequest(BaseModel):
     steps: list[PlaybookStepItem] = Field(..., min_length=1)
     tag_ids: list[int] = []
     status: PlaybookStatusLiteral = "draft"
+    is_private: bool = False
 
 
 class PlaybookUpdateRequest(BaseModel):

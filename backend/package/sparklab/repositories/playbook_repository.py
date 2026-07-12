@@ -34,12 +34,24 @@ class PlaybookRepository:
         offset: int = 0,
         limit: int = 20,
         sort_by: str = "use_count",
+        include_private: bool = False,
     ) -> tuple[list[Playbook], int]:
+        """查询流程列表。
+
+        Args:
+            include_private: 是否包含私有流程。管理员查看时设为 True，
+                           普通用户查看公开流程时设为 False（默认）。
+        """
         query = select(Playbook).options(
             selectinload(Playbook.tags),
             selectinload(Playbook.steps),
         )
         count_query = select(func.count(Playbook.id))
+
+        # 默认排除私有流程（除非明确包含）
+        if not include_private:
+            query = query.where(Playbook.is_private == False)  # noqa: E712
+            count_query = count_query.where(Playbook.is_private == False)  # noqa: E712
 
         if search:
             pattern = f"%{search}%"
@@ -80,6 +92,50 @@ class PlaybookRepository:
         items = list(result.scalars().all())
         return items, total
 
+    async def list_by_user(
+        self,
+        user_id: int,
+        *,
+        search: str | None = None,
+        status: str | None = None,
+        offset: int = 0,
+        limit: int = 20,
+        sort_by: str = "newest",
+    ) -> tuple[list[Playbook], int]:
+        """查询用户自己的流程列表（包含私有和公开的）。"""
+        query = select(Playbook).options(
+            selectinload(Playbook.tags),
+            selectinload(Playbook.steps),
+        )
+        count_query = select(func.count(Playbook.id))
+
+        # 只查当前用户的流程
+        query = query.where(Playbook.creator_id == user_id)
+        count_query = count_query.where(Playbook.creator_id == user_id)
+
+        if search:
+            pattern = f"%{search}%"
+            cond = Playbook.title.ilike(pattern) | Playbook.description.ilike(pattern)
+            query = query.where(cond)
+            count_query = count_query.where(cond)
+
+        if status:
+            query = query.where(Playbook.status == status)
+            count_query = count_query.where(Playbook.status == status)
+
+        if sort_by == "newest":
+            query = query.order_by(Playbook.created_at.desc())
+        else:
+            query = query.order_by(Playbook.use_count.desc(), Playbook.created_at.desc())
+
+        total_result = await self.db.execute(count_query)
+        total = total_result.scalar() or 0
+
+        query = query.offset(offset).limit(limit)
+        result = await self.db.execute(query)
+        items = list(result.scalars().all())
+        return items, total
+
     async def create(
         self,
         *,
@@ -91,6 +147,7 @@ class PlaybookRepository:
         status: str,
         creator_id: int | None,
         tag_ids: list[int] | None,
+        is_private: bool = False,
     ) -> Playbook:
         playbook = Playbook(
             title=title,
@@ -99,6 +156,7 @@ class PlaybookRepository:
             variable_hints=json.dumps(variable_hints, ensure_ascii=False) if variable_hints else None,
             status=PlaybookStatus(status),
             creator_id=creator_id,
+            is_private=is_private,
         )
         self.db.add(playbook)
         await self.db.flush()

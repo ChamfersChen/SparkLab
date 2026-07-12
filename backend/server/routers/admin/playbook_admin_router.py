@@ -52,6 +52,7 @@ async def list_playbooks(
     sort_by: str = Query("use_count", description="排序：use_count / newest"),
     service: PlaybookService = Depends(_get_service),
 ):
+    """管理员流程列表（仅公开流程，不包含普通用户私有流程）。"""
     items, total = await service.list_playbooks(
         search=search,
         tag_id_groups=_parse_tag_id_groups(tag_ids),
@@ -59,6 +60,7 @@ async def list_playbooks(
         page=page,
         page_size=page_size,
         sort_by=sort_by,
+        include_private=False,  # 管理员不查看普通用户的私有流程
     )
     return PlaybookListResponse(
         items=[PlaybookResponse.model_validate(p) for p in items],

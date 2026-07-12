@@ -21,8 +21,8 @@ public 欢迎页 (/)
   │   ├─ greeting："欢迎来到 SparkLab" ↔ "欢迎回来，{username}"
   │   ├─ subtitle：访客口径 ↔ 工作台口径
   │   └─ CTA：[登录] ↔ [进入系统]
-  ├─ 业务模块入口区（4 张 ModuleCard）
-  │   ├─ Prompt 模板 / Playbook 剧本 / AI 资讯（全员可见）
+  ├─ 业务模块入口区（3 张 ModuleCard）
+  │   ├─ Prompt 模板 / Playbook 剧本（全员可见）
   │   └─ 管理后台（仅 isAdmin/isSuperAdmin 可见）
   ├─ 平台标签条（DeepSeek / Kimi / 豆包 / 通义千问）
   └─ 阶段提示（骨架期显示，业务模块上线后移除）

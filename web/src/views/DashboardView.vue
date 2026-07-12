@@ -3,13 +3,13 @@
  * Dashboard 首页（登录后默认落地页）。
  *
  * 阶段角色：
- * - 当前为骨架阶段：业务模块（Templates/Playbooks/News/Admin）均未上线，
+ * - 当前为骨架阶段：业务模块（Templates/Playbooks/Admin）均未上线，
  *   全部以 disabled 卡片形式呈现，给用户"未来会有什么"的预期，而不堆假数据。
  * - 业务模块上线时，把对应 module 的 disabled 改 false 并配上 to/handler 即可。
  */
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { FileText, BookOpen, Newspaper, Settings, Sparkles, LogIn, ArrowRight } from 'lucide-vue-next'
+import { FileText, BookOpen, Settings, Sparkles, LogIn, ArrowRight } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import AppHeader from '@/components/AppHeader.vue'
 import ModuleCard from '@/components/ModuleCard.vue'
@@ -58,18 +58,10 @@ const ALL_MODULES = [
     badge: '敬请期待'
   },
   {
-    key: 'news',
-    icon: Newspaper,
-    title: 'AI 资讯',
-    subtitle: '由管理员维护的精选行业资讯与解读。',
-    disabled: true,
-    badge: '敬请期待'
-  },
-  {
     key: 'admin',
     icon: Settings,
     title: '管理后台',
-    subtitle: '管理模板、剧本、资讯与激活码。',
+    subtitle: '管理模板、剧本与激活码。',
     disabled: true,
     badge: '敬请期待',
     adminOnly: true

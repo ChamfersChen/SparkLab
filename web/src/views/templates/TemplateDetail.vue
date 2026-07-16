@@ -173,8 +173,6 @@ onMounted(fetchData)
                 <span>返回</span>
               </button>
               <h1 class="page-bar__title">{{ template.title }}</h1>
-            </div>
-            <div class="page-bar__right-meta">
               <button
                 class="fav-btn"
                 :class="{ 'fav-btn--active': isFavorited }"
@@ -183,6 +181,8 @@ onMounted(fetchData)
               >
                 <Heart :size="16" :fill="isFavorited ? 'currentColor' : 'none'" />
               </button>
+            </div>
+            <div class="page-bar__right-meta">
               <span
                 v-if="STATUS_LABEL[template.status]"
                 class="status-tag"

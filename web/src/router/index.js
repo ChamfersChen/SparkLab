@@ -18,7 +18,7 @@ const routes = [
     path: '/',
     name: 'dashboard',
     component: () => import('@/views/DashboardView.vue'),
-    meta: { public: true, layout: 'blank' }
+    meta: { layout: 'blank' }
   },
   {
     path: '/admin/activation-codes',

@@ -34,7 +34,8 @@ function handleLogin() {
 <template>
   <header class="app-header">
     <router-link to="/" class="brand">
-      <Zap :size="20" :stroke-width="2.25" />
+      <!-- <Zap :size="20" :stroke-width="2.25" /> -->
+      <img src="/favicon-g.svg" alt="logo" width="35" height="35" />
       <span>SparkLab</span>
     </router-link>
 

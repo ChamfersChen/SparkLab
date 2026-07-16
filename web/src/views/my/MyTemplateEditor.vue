@@ -234,7 +234,7 @@ onMounted(() => {
               </div>
             </div>
             <p class="section-hint">
-              支持 Markdown。<code>{`{{变量名}}`}</code> 语法会被识别为可填变量,例如：<code>{`{{产品名称}}`}</code>。
+              支持 Markdown。<code v-pre>{{变量名}}</code> 语法会被识别为可填变量,例如：<code v-pre>{{产品名称}}</code>。
             </p>
 
             <div v-show="viewMode === 'edit'" class="content-editor">
@@ -275,7 +275,7 @@ onMounted(() => {
               >{{ v }}</span>
             </div>
             <div v-else-if="form.content" class="no-vars-hint">
-              当前内容未包含 <code>{`{{变量名}}`}</code>,提示词将无变量可填
+              当前内容未包含 <code v-pre>{{变量名}}</code>,提示词将无变量可填
             </div>
           </section>
 

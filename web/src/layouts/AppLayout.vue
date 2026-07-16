@@ -119,7 +119,8 @@ const roleLabel = computed(() => {
         <Menu :size="20" />
       </button>
       <router-link to="/" class="mobile-brand">
-        <div class="brand-icon">S</div>
+        <!-- <div class="brand-icon">S</div> -->
+        <img src="/favicon.svg" alt="logo" width="35" height="35" />
         <span class="brand-name">SparkLab</span>
       </router-link>
       <a-dropdown placement="bottomRight" :trigger="['click']">
@@ -145,7 +146,8 @@ const roleLabel = computed(() => {
       <!-- 品牌区 -->
       <div class="sidebar-brand">
         <router-link to="/" class="brand-link">
-          <div class="brand-icon">S</div>
+          <!-- <div class="brand-icon">S</div> -->
+          <img src="/favicon.svg" alt="logo" width="35" height="35" />
           <span v-show="!collapsed" class="brand-name">SparkLab</span>
         </router-link>
         <button
@@ -605,6 +607,23 @@ const roleLabel = computed(() => {
 
 .collapsed .user-menu-btn {
   display: none;
+}
+
+.collapsed .collapse-btn {
+  display: none;
+}
+
+.collapsed .sidebar:hover .sidebar-brand {
+  justify-content: space-between;
+  padding: 0 12px;
+}
+
+.collapsed .sidebar:hover .brand-link {
+  justify-content: flex-start;
+}
+
+.collapsed .sidebar:hover .collapse-btn {
+  display: inline-flex;
 }
 
 /* ========== Mobile (<=768px) ========== */

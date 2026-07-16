@@ -494,7 +494,7 @@ onMounted(fetchData)
                       </span>
                     </div>
                     <p class="prev-paste__hint">
-                      去 AI 平台把上一步生成的内容贴回来,会自动注入到本步的 <code>{`{{prev_output}}`}</code> 占位符。
+                      去 AI 平台把上一步生成的内容贴回来,会自动注入到本步的 <code v-pre>{{prev_output}}</code> 占位符。
                     </p>
                     <a-textarea
                       :model-value="stepPrevOutputs[currentStep?.step_order] || ''"

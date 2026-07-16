@@ -289,7 +289,7 @@ onMounted(async () => {
               </div>
             </div>
             <p class="section-hint">
-              作为「全局上下文」展示在运行页顶部。支持 Markdown 与 <code>{`{{变量名}}`}</code> 占位符。
+              作为「全局上下文」展示在运行页顶部。支持 Markdown 与 <code v-pre>{{变量名}}</code> 占位符。
             </p>
 
             <div v-show="viewMode === 'edit'" class="content-editor">
@@ -317,7 +317,7 @@ onMounted(async () => {
               <span v-for="v in extractedVars" :key="v" class="var-chip">{{ v }}</span>
             </div>
             <div v-else-if="form.content" class="no-vars-hint">
-              当前内容未包含 <code>{`{{变量名}}`}</code>,流程将无变量可填
+              当前内容未包含 <code v-pre>{{变量名}}</code>,流程将无变量可填
             </div>
           </section>
 
@@ -347,8 +347,8 @@ onMounted(async () => {
               </button>
             </div>
             <p class="section-hint">
-              每个步骤自带 Prompt 内容,支持 <code>{`{{变量}}`}</code> 与特殊占位符
-              <code>{`{{prev_output}}`}</code>。
+              每个步骤自带 Prompt 内容,支持 <code v-pre>{{变量}}</code> 与特殊占位符
+              <code v-pre>{{prev_output}}</code>。
             </p>
 
             <div v-if="!form.steps.length" class="step-empty">
@@ -369,7 +369,7 @@ onMounted(async () => {
                     </a-form-item>
                     <a-form-item label="步骤内容（Markdown）" required>
                       <div class="step-mode-bar">
-                        <span class="step-mode-hint">支持 <code>{`{{变量}}`}</code> 与 <code>{`{{prev_output}}`}</code></span>
+                        <span class="step-mode-hint">支持 <code v-pre>{{变量}}</code> 与 <code v-pre>{{prev_output}}</code></span>
                         <div class="mode-switch">
                           <button
                             type="button"

@@ -8,9 +8,10 @@
 import { ref, onMounted, computed, h } from 'vue'
 import { useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
-import { Plus, Copy, Check, Power, PowerOff, Link, Edit2, Inbox, Trash2 } from 'lucide-vue-next'
+import { Plus, Copy, Check, Power, PowerOff, Link, Edit2, Inbox, Trash2, KeyRound } from 'lucide-vue-next'
 import { useUserStore } from '@/stores/user'
 import { listActivationCodes, generateCodes, toggleCodeStatus, updateCodeNote, deleteCode } from '@/apis/activation_code_api'
+import { resetUserPassword } from '@/apis/admin_account_api'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -120,6 +121,45 @@ function handleHardDelete(record) {
       }
     },
   })
+}
+
+// ========== 重置密码 ==========
+const resetPwdVisible = ref(false)
+const resetPwdRecord = ref(null)
+const resetPwdNew = ref('')
+const resetPwdConfirm = ref('')
+const resetPwdLoading = ref(false)
+
+function openResetPwd(record) {
+  resetPwdRecord.value = record
+  resetPwdNew.value = ''
+  resetPwdConfirm.value = ''
+  resetPwdVisible.value = true
+}
+
+async function handleResetPwd() {
+  if (!resetPwdNew.value) {
+    message.warning('请输入新密码')
+    return
+  }
+  if (resetPwdNew.value.length < 6) {
+    message.warning('密码至少 6 位')
+    return
+  }
+  if (resetPwdNew.value !== resetPwdConfirm.value) {
+    message.warning('两次密码输入不一致')
+    return
+  }
+  resetPwdLoading.value = true
+  try {
+    await resetUserPassword(resetPwdRecord.value.user.id, { new_password: resetPwdNew.value })
+    message.success(`已重置「${resetPwdRecord.value.user.username}」的密码`)
+    resetPwdVisible.value = false
+  } catch {
+    // error handled by base.js
+  } finally {
+    resetPwdLoading.value = false
+  }
 }
 
 function handleStartEditNote(record) {
@@ -245,7 +285,7 @@ onMounted(fetchData)
             { title: '使用者', dataIndex: 'user', width: 120 },
             { title: '使用时间', dataIndex: 'used_at', width: 170 },
             { title: '创建时间', dataIndex: 'created_at', width: 170 },
-            { title: '操作', key: 'actions', width: 180, fixed: 'right' },
+            { title: '操作', key: 'actions', width: 210, fixed: 'right' },
           ]"
           :pagination="{
             current: currentPage,
@@ -338,6 +378,19 @@ onMounted(fetchData)
                   </a-button>
                 </a-tooltip>
 
+                <a-tooltip
+                  v-if="record.status === 'used'"
+                  title="重置密码"
+                >
+                  <a-button
+                    size="small"
+                    class="action-icon"
+                    @click="openResetPwd(record)"
+                  >
+                    <KeyRound :size="14" />
+                  </a-button>
+                </a-tooltip>
+
                 <a-tooltip :title="record.status === 'disabled' ? '启用' : '禁用'">
                   <a-button
                     v-if="record.status !== 'used'"
@@ -393,6 +446,40 @@ onMounted(fetchData)
             placeholder="添加备注信息，方便管理"
             :rows="3"
           />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <!-- 重置密码 -->
+    <a-modal
+      v-model:open="resetPwdVisible"
+      title="重置密码"
+      :confirm-loading="resetPwdLoading"
+      ok-text="确认重置"
+      cancel-text="取消"
+      @ok="handleResetPwd"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="目标用户">
+          <a-input :value="resetPwdRecord?.user?.username" disabled />
+        </a-form-item>
+        <a-form-item label="新密码">
+          <a-input-password
+            v-model:value="resetPwdNew"
+            placeholder="至少 6 位"
+            size="large"
+          >
+            <template #prefix><KeyRound :size="16" /></template>
+          </a-input-password>
+        </a-form-item>
+        <a-form-item label="确认密码">
+          <a-input-password
+            v-model:value="resetPwdConfirm"
+            placeholder="再次输入密码"
+            size="large"
+          >
+            <template #prefix><KeyRound :size="16" /></template>
+          </a-input-password>
         </a-form-item>
       </a-form>
     </a-modal>

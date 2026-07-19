@@ -1,4 +1,3 @@
-
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -204,9 +203,7 @@ class AuthService:
         offset: int = 0,
         limit: int = 20,
     ) -> tuple[list[User], int]:
-        return await self.user_repo.list_admins(
-            role_filter, active_filter, search, offset, limit
-        )
+        return await self.user_repo.list_admins(role_filter, active_filter, search, offset, limit)
 
     async def update_user_role(self, user_id: int, new_role: str, current_user_id: int) -> User:
         # 不能修改自己的角色
@@ -275,6 +272,16 @@ class AuthService:
             await self.db.commit()
         return result
 
+    async def admin_reset_password(self, user_id: int, new_pwd: str) -> None:
+        user = await self.user_repo.get_by_id(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="用户不存在",
+            )
+        await self.user_repo.update_password(user_id, hash_password(new_pwd))
+        await self.db.commit()
+
     async def generate_admin_codes(
         self,
         count: int,
@@ -297,4 +304,3 @@ class AuthService:
         limit: int = 20,
     ) -> tuple[list[ActivationCode], int]:
         return await self.code_repo.list_admin_codes(status_filter, search, offset, limit)
-

@@ -29,6 +29,10 @@ export function deleteUser(userId) {
   return apiSuperAdminDelete(`/admins/${userId}`)
 }
 
+export function resetUserPassword(userId, data) {
+  return apiSuperAdminPut(`/admins/${userId}/password`, data)
+}
+
 // ========== 管理员激活码管理 ==========
 
 export function listAdminCodes(params = {}) {

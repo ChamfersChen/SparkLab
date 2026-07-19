@@ -1,4 +1,3 @@
-
 """管理员账号管理路由（超级管理员）。
 
 - GET    /api/admin/admins                      → 分页查询管理员列表
@@ -16,6 +15,7 @@ from sparklab.models.user import User
 from sparklab.schemas.auth import (
     ActivationCodeListResponse,
     ActivationCodeWithUser,
+    AdminResetPasswordRequest,
     AdminUserInfo,
     AdminUserListResponse,
     GenerateCodesRequest,
@@ -99,6 +99,16 @@ async def delete_admin_user(
     return MessageResponse(message="账号已删除")
 
 
+@admin_account.put("/{user_id}/password", response_model=MessageResponse)
+async def reset_user_password(
+    user_id: int,
+    body: AdminResetPasswordRequest,
+    service: AuthService = Depends(_get_service),
+):
+    await service.admin_reset_password(user_id, body.new_password)
+    return MessageResponse(message="密码已重置")
+
+
 # ========== 管理员激活码管理 ==========
 
 
@@ -163,4 +173,3 @@ async def delete_admin_code(
             detail="激活码不存在或不可删除（仅未使用/已禁用的激活码可删除）",
         )
     return MessageResponse(message="激活码已删除")
-

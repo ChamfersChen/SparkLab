@@ -165,3 +165,14 @@ class AdminUserListResponse(BaseModel):
 
 class UpdateRoleRequest(BaseModel):
     role: str
+
+
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 6:
+            raise ValueError("密码至少 6 位")
+        return v

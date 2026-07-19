@@ -22,7 +22,6 @@ from sparklab.services.template_service import TemplateService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.utils.auth_middleware import get_db, get_required_user
-from server.routers.template_router import _parse_tag_id_groups
 
 my_templates = APIRouter(prefix="/my/templates", tags=["我的模板"])
 

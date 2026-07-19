@@ -1,4 +1,3 @@
-
 """管理员路由入口。
 
 所有管理员路由都在 /api/admin/* 之下，依赖 get_current_super_admin 确保权限。
@@ -20,4 +19,3 @@ admin_router.include_router(template_admin)
 admin_router.include_router(playbook_admin)
 admin_router.include_router(admin_account)
 admin_router.include_router(dashboard_admin)
-

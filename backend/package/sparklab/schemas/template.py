@@ -8,6 +8,7 @@ TemplateStatusLiteral = Literal["draft", "published", "archived"]
 
 class TagInfo(BaseModel):
     """标签的简洁表示（嵌入模板响应中）。"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -50,6 +51,7 @@ class TemplateResponse(BaseModel):
         if isinstance(v, dict):
             return v
         import json
+
         try:
             return json.loads(v)
         except (json.JSONDecodeError, TypeError):
@@ -94,6 +96,7 @@ class TemplateListParams(BaseModel):
 
 class FillDataResponse(BaseModel):
     """模板填写页数据。"""
+
     model_config = ConfigDict(from_attributes=True)
 
     template_id: int
@@ -110,6 +113,7 @@ class FillDataResponse(BaseModel):
         if isinstance(v, dict):
             return v
         import json
+
         try:
             return json.loads(v)
         except (json.JSONDecodeError, TypeError):
@@ -118,6 +122,7 @@ class FillDataResponse(BaseModel):
 
 class VariableExtractResponse(BaseModel):
     """变量提取结果。"""
+
     variables: list[str]
 
 
@@ -126,6 +131,7 @@ class VariableExtractResponse(BaseModel):
 
 class TemplateRunCreateRequest(BaseModel):
     """保存一次模板使用的请求体."""
+
     template_id: int
     title: str | None = Field(default=None, max_length=200)
     generated_prompt: str
@@ -135,6 +141,7 @@ class TemplateRunCreateRequest(BaseModel):
 
 class TemplateRunSummary(BaseModel):
     """列表项 — 不含详细内容."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -148,6 +155,7 @@ class TemplateRunSummary(BaseModel):
 
 class TemplateRunDetail(BaseModel):
     """详情 — 含生成的 prompt 和变量值."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

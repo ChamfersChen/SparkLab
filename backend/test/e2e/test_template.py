@@ -1,4 +1,5 @@
 """模板管理的 e2e 测试（用户端 + 管理后台）。"""
+
 import time
 
 import pytest
@@ -394,9 +395,7 @@ async def test_draft_template_invisible_to_other_users(client: AsyncClient) -> N
     assert create.status_code == 201
     tid = create.json()["id"]
 
-    other_headers = await _create_user_and_get_headers(
-        client, admin_headers, "other_user_draft"
-    )
+    other_headers = await _create_user_and_get_headers(client, admin_headers, "other_user_draft")
     resp = await client.get(f"/api/templates/{tid}", headers=other_headers)
     assert resp.status_code == 404
 
@@ -430,9 +429,7 @@ async def test_archived_template_invisible_to_other_users(client: AsyncClient) -
     )
     assert arch.status_code == 200
 
-    other_headers = await _create_user_and_get_headers(
-        client, admin_headers, "other_user_arch"
-    )
+    other_headers = await _create_user_and_get_headers(client, admin_headers, "other_user_arch")
     resp = await client.get(f"/api/templates/{tid}", headers=other_headers)
     assert resp.status_code == 404
 

@@ -18,18 +18,14 @@ class FavoriteService:
     async def _validate_target(self, target_type: FavoriteTargetType, target_id: int) -> None:
         """校验目标存在且已发布。"""
         if target_type == FavoriteTargetType.TEMPLATE:
-            result = await self.db.execute(
-                select(Template).where(Template.id == target_id)
-            )
+            result = await self.db.execute(select(Template).where(Template.id == target_id))
             tpl = result.scalar_one_or_none()
             if not tpl:
                 raise HTTPException(status_code=404, detail="模板不存在")
             if tpl.status != TemplateStatus.PUBLISHED:
                 raise HTTPException(status_code=400, detail="该模板未发布,无法收藏")
         else:
-            result = await self.db.execute(
-                select(Playbook).where(Playbook.id == target_id)
-            )
+            result = await self.db.execute(select(Playbook).where(Playbook.id == target_id))
             pb = result.scalar_one_or_none()
             if not pb:
                 raise HTTPException(status_code=404, detail="工作流不存在")
@@ -64,8 +60,6 @@ class FavoriteService:
             limit=page_size,
         )
 
-    async def check_favorited(
-        self, user_id: int, target_type: FavoriteTargetType, target_id: int
-    ) -> bool:
+    async def check_favorited(self, user_id: int, target_type: FavoriteTargetType, target_id: int) -> bool:
         fav = await self.repo.get_by_user_and_target(user_id, target_type, target_id)
         return fav is not None

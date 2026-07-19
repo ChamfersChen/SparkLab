@@ -15,9 +15,7 @@ class TemplateRepository:
 
     async def get_by_id(self, template_id: int) -> Template | None:
         result = await self.db.execute(
-            select(Template)
-            .where(Template.id == template_id)
-            .options(selectinload(Template.tags))
+            select(Template).where(Template.id == template_id).options(selectinload(Template.tags))
         )
         return result.scalar_one_or_none()
 
@@ -49,12 +47,8 @@ class TemplateRepository:
         # 搜索
         if search:
             pattern = f"%{search}%"
-            query = query.where(
-                Template.title.ilike(pattern) | Template.description.ilike(pattern)
-            )
-            count_query = count_query.where(
-                Template.title.ilike(pattern) | Template.description.ilike(pattern)
-            )
+            query = query.where(Template.title.ilike(pattern) | Template.description.ilike(pattern))
+            count_query = count_query.where(Template.title.ilike(pattern) | Template.description.ilike(pattern))
 
         # 状态筛选
         if status:
@@ -112,12 +106,8 @@ class TemplateRepository:
         # 搜索
         if search:
             pattern = f"%{search}%"
-            query = query.where(
-                Template.title.ilike(pattern) | Template.description.ilike(pattern)
-            )
-            count_query = count_query.where(
-                Template.title.ilike(pattern) | Template.description.ilike(pattern)
-            )
+            query = query.where(Template.title.ilike(pattern) | Template.description.ilike(pattern))
+            count_query = count_query.where(Template.title.ilike(pattern) | Template.description.ilike(pattern))
 
         # 状态筛选
         if status:
@@ -194,9 +184,7 @@ class TemplateRepository:
         await self.db.flush()
 
         if tag_ids is not None:
-            await self.db.execute(
-                TemplateTag.__table__.delete().where(TemplateTag.template_id == template_id)
-            )
+            await self.db.execute(TemplateTag.__table__.delete().where(TemplateTag.template_id == template_id))
             for tid in tag_ids:
                 self.db.add(TemplateTag(template_id=template_id, tag_id=tid))
             await self.db.flush()
@@ -213,9 +201,7 @@ class TemplateRepository:
 
     async def increment_use_count(self, template_id: int) -> None:
         await self.db.execute(
-            update(Template)
-            .where(Template.id == template_id)
-            .values(use_count=Template.use_count + 1)
+            update(Template).where(Template.id == template_id).values(use_count=Template.use_count + 1)
         )
         await self.db.flush()
 
@@ -242,6 +228,7 @@ def detail_run(run: TemplateRun) -> dict:
     if run.form_values_json:
         try:
             import json as _json
+
             form_values = _json.loads(run.form_values_json)
         except (ValueError, TypeError):
             form_values = {}
@@ -317,10 +304,7 @@ class TemplateRunRepository:
             return None
         if run.user_id != user_id:
             return None
-        result = await self.db.execute(
-            select(TemplateRun)
-            .where(TemplateRun.id == run_id)
-        )
+        result = await self.db.execute(select(TemplateRun).where(TemplateRun.id == run_id))
         return result.scalar_one_or_none()
 
     async def delete(self, run_id: int, user_id: int) -> bool:

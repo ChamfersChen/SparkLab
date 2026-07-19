@@ -2,11 +2,11 @@
 
 测试之前必须先通过管理员登录获取令牌。
 """
+
 import time
 
 import pytest
 from httpx import AsyncClient
-
 from sparklab.config import get_settings
 
 

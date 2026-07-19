@@ -34,9 +34,7 @@ async def list_favorites(
     service: FavoriteService = Depends(_get_service),
 ):
     target_type = FavoriteTargetType(type) if type else None
-    items, total = await service.list_favorites(
-        user.id, target_type=target_type, page=page, page_size=page_size
-    )
+    items, total = await service.list_favorites(user.id, target_type=target_type, page=page, page_size=page_size)
     return FavoriteListResponse(
         items=[FavoriteResponse(**item) for item in items],
         total=total,
@@ -63,6 +61,7 @@ async def remove_favorite(
 ):
     t = FavoriteTargetType(target_type)
     from sparklab.repositories.favorite_repository import FavoriteRepository
+
     repo = FavoriteRepository(service.db)
     deleted = await repo.delete(user.id, t, target_id)
     await service.db.commit()

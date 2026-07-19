@@ -1,5 +1,4 @@
-
-from sqlalchemy import select, or_, func
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sparklab.models.user import User, UserRole
@@ -51,9 +50,7 @@ class UserRepository:
         offset: int = 0,
         limit: int = 20,
     ) -> tuple[list[User], int]:
-        query = select(User).where(
-            or_(User.role == UserRole.ADMIN, User.role == UserRole.SUPER_ADMIN)
-        )
+        query = select(User).where(or_(User.role == UserRole.ADMIN, User.role == UserRole.SUPER_ADMIN))
 
         if role_filter:
             query = query.where(User.role == role_filter)
@@ -97,4 +94,3 @@ class UserRepository:
             await self.db.flush()
             return True
         return False
-

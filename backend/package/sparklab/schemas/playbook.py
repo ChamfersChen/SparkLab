@@ -8,6 +8,7 @@
   - 步骤不再关联 Template: 自带 content (Markdown + {{var}} + {{prev_output}})
   - 运行期 {{prev_output}} 由前端把上一步 AI 平台返回结果粘回,放在 PlaybookStepOutput.prev_output
 """
+
 from datetime import datetime
 from typing import Literal
 
@@ -18,6 +19,7 @@ PlaybookStatusLiteral = Literal["draft", "published", "archived"]
 
 class TagInfo(BaseModel):
     """标签的简洁表示（嵌入工作流响应中）。"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -32,6 +34,7 @@ class TagInfo(BaseModel):
 
 class PlaybookStepItem(BaseModel):
     """工作流中一个步骤的对外表示。"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int | None = None
@@ -44,6 +47,7 @@ class PlaybookStepItem(BaseModel):
 
 class PlaybookResponse(BaseModel):
     """工作流详情。"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -74,6 +78,7 @@ class PlaybookResponse(BaseModel):
         if isinstance(v, dict):
             return v
         import json
+
         try:
             return json.loads(v)
         except (json.JSONDecodeError, TypeError):
@@ -99,6 +104,7 @@ class PlaybookCreateRequest(BaseModel):
 
 class PlaybookUpdateRequest(BaseModel):
     """全字段可选;steps 若提供则为「整组替换」。"""
+
     title: str | None = Field(default=None, min_length=1, max_length=200)
     description: str | None = Field(default=None, min_length=1, max_length=500)
     content: str | None = None
@@ -116,6 +122,7 @@ class PlaybookStatusChangeRequest(BaseModel):
 # 运行相关
 # ---------------------------------------------------------------------------
 
+
 class PlaybookStepOutput(BaseModel):
     """用户在某一步提交的内容。
 
@@ -123,6 +130,7 @@ class PlaybookStepOutput(BaseModel):
     会被注入到该步骤 content 的 {{prev_output}} 占位符里。
     form_values 是该步骤自己的变量填写值。
     """
+
     step_order: int = Field(..., ge=0)
     form_values: dict[str, str] = Field(default_factory=dict)
     prev_output: str | None = None
@@ -130,12 +138,14 @@ class PlaybookStepOutput(BaseModel):
 
 class PlaybookRunRequest(BaseModel):
     """运行工作流：用户提交所有步骤的填写值。"""
+
     form_values: dict[str, str] = Field(default_factory=dict, description="工作流级变量")
     step_outputs: list[PlaybookStepOutput] = Field(default_factory=list)
 
 
 class PlaybookRunStep(BaseModel):
     """运行后某一步的渲染结果。"""
+
     step_order: int
     name: str
     # 替换 {{var}} + {{prev_output}} 后的最终内容(Markdown)
@@ -156,6 +166,7 @@ class PlaybookRunResponse(BaseModel):
 # 运行记录保存（个人中心 / 我的运行记录）
 # ---------------------------------------------------------------------------
 
+
 def _parse_form_values_json(v):
     """字段 validator: 把存盘的 JSON 字符串解析为 dict (None / dict 透传)."""
     if v is None or v == "":
@@ -163,6 +174,7 @@ def _parse_form_values_json(v):
     if isinstance(v, dict):
         return v
     import json
+
     try:
         result = json.loads(v)
         return result if isinstance(result, dict) else {}
@@ -172,6 +184,7 @@ def _parse_form_values_json(v):
 
 class PlaybookRunStepItem(BaseModel):
     """一次运行中某一步的对外表示 (列表 + 详情共用)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     step_order: int
@@ -190,6 +203,7 @@ class PlaybookRunStepItem(BaseModel):
 
 class PlaybookRunSummary(BaseModel):
     """列表项 — 不带 steps 详情, 只给统计."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -207,6 +221,7 @@ class PlaybookRunSummary(BaseModel):
 
 class PlaybookRunDetail(BaseModel):
     """详情 — 含 steps."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -225,6 +240,7 @@ class PlaybookRunDetail(BaseModel):
 
 class PlaybookRunCreateRequest(BaseModel):
     """保存一次运行的请求体."""
+
     playbook_id: int
     title: str | None = Field(default=None, max_length=200)
     # v4: 用户在三栏页右栏填的"最终结果" (Markdown 源文本, 渲染时后端做)

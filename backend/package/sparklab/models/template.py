@@ -31,12 +31,8 @@ class TemplateTag(Base):
 
     __tablename__ = "template_tags"
 
-    template_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("templates.id", ondelete="CASCADE"), primary_key=True
-    )
-    tag_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
-    )
+    template_id: Mapped[int] = mapped_column(Integer, ForeignKey("templates.id", ondelete="CASCADE"), primary_key=True)
+    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
 
 
 class Template(Base, TimestampMixin):
@@ -58,9 +54,7 @@ class Template(Base, TimestampMixin):
         default=TemplateStatus.DRAFT,
     )
     use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    creator_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    creator_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     # 是否为私有模板（普通用户创建为私有，管理员创建为公开）
     is_private: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
@@ -89,12 +83,8 @@ class TemplateRun(Base, TimestampMixin):
     __tablename__ = "template_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    template_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("templates.id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    template_id: Mapped[int] = mapped_column(Integer, ForeignKey("templates.id", ondelete="CASCADE"), nullable=False)
     # 用户自定义标题; 默认值由 service 层根据 template.title + 时间戳生成
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # 生成的最终 prompt

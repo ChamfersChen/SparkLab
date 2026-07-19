@@ -15,6 +15,7 @@
 
 复用 template_router._parse_tag_id_groups 处理 tag_ids 字符串。
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sparklab.repositories.playbook_repository import detail_run
 from sparklab.schemas.playbook import (
@@ -75,6 +76,7 @@ async def list_playbooks(
 # 必须在 {playbook_id} 路径之前声明, 否则会被参数化路径吞掉
 # ---------------------------------------------------------------------------
 
+
 @playbook.get("/runs", response_model=PlaybookRunListResponse)
 async def list_my_runs(
     page: int = Query(1, ge=1),
@@ -84,7 +86,9 @@ async def list_my_runs(
 ):
     """当前用户的运行记录列表, 按 created_at DESC."""
     items, total = await run_service.list_user_runs(
-        user.id, offset=(page - 1) * page_size, limit=page_size,
+        user.id,
+        offset=(page - 1) * page_size,
+        limit=page_size,
     )
     return PlaybookRunListResponse(items=items, total=total)
 
@@ -147,6 +151,7 @@ async def delete_my_run(
 # ---------------------------------------------------------------------------
 # 工作流本身的端点 (参数化路径放最后)
 # ---------------------------------------------------------------------------
+
 
 @playbook.get("/{playbook_id}", response_model=PlaybookResponse)
 async def get_playbook(

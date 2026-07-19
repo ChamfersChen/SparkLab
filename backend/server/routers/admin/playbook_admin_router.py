@@ -8,7 +8,16 @@
 - DELETE /api/admin/playbooks/{id}        → 下线（软删 → archived）
 - DELETE /api/admin/playbooks/{id}/hard   → 物理删除（仅超管）
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sparklab.schemas.playbook import (
+    PlaybookCreateRequest,
+    PlaybookListResponse,
+    PlaybookResponse,
+    PlaybookStatusChangeRequest,
+    PlaybookUpdateRequest,
+)
+from sparklab.services.playbook_service import PlaybookService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.routers.template_router import _parse_tag_id_groups
@@ -18,15 +27,6 @@ from server.utils.auth_middleware import (
     get_db,
     get_required_user,
 )
-from sparklab.schemas.playbook import (
-    PlaybookCreateRequest,
-    PlaybookListResponse,
-    PlaybookResponse,
-    PlaybookStatusChangeRequest,
-    PlaybookUpdateRequest,
-)
-from sparklab.services.playbook_service import PlaybookService
-
 
 playbook_admin = APIRouter(
     prefix="/playbooks",
@@ -108,9 +108,7 @@ async def update_playbook(
     service: PlaybookService = Depends(_get_service),
 ):
     kwargs = body.model_dump(exclude_none=True)
-    return PlaybookResponse.model_validate(
-        await service.update_playbook(playbook_id, **kwargs)
-    )
+    return PlaybookResponse.model_validate(await service.update_playbook(playbook_id, **kwargs))
 
 
 @playbook_admin.put("/{playbook_id}/status", response_model=PlaybookResponse)
@@ -119,9 +117,7 @@ async def change_status(
     body: PlaybookStatusChangeRequest,
     service: PlaybookService = Depends(_get_service),
 ):
-    return PlaybookResponse.model_validate(
-        await service.change_status(playbook_id, body.status)
-    )
+    return PlaybookResponse.model_validate(await service.change_status(playbook_id, body.status))
 
 
 @playbook_admin.delete("/{playbook_id}", status_code=status.HTTP_204_NO_CONTENT)

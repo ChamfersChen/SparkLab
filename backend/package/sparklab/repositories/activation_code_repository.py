@@ -1,7 +1,6 @@
-
 from datetime import UTC, datetime
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -144,4 +143,3 @@ class ActivationCodeRepository:
         result = await self.db.execute(query)
         items = list(result.unique().scalars().all())
         return items, total
-

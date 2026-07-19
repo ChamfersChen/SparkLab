@@ -1,6 +1,7 @@
 """工作流 (Playbook) 数据访问层。
 
 所有方法都是 async；只做 DB 操作，不做业务校验。"""
+
 import json
 
 from sqlalchemy import delete, func, select, update
@@ -199,9 +200,7 @@ class PlaybookRepository:
                 setattr(playbook, key, value)
 
         if variable_hints is not _SENTINEL:
-            playbook.variable_hints = (
-                json.dumps(variable_hints, ensure_ascii=False) if variable_hints else None
-            )
+            playbook.variable_hints = json.dumps(variable_hints, ensure_ascii=False) if variable_hints else None
         if status is not _SENTINEL:
             playbook.status = PlaybookStatus(status)
 
@@ -209,9 +208,7 @@ class PlaybookRepository:
 
         if steps is not _SENTINEL:
             # 整组替换
-            await self.db.execute(
-                delete(PlaybookStep).where(PlaybookStep.playbook_id == playbook_id)
-            )
+            await self.db.execute(delete(PlaybookStep).where(PlaybookStep.playbook_id == playbook_id))
             for s in steps:
                 self.db.add(
                     PlaybookStep(
@@ -225,9 +222,7 @@ class PlaybookRepository:
             await self.db.flush()
 
         if tag_ids is not _SENTINEL:
-            await self.db.execute(
-                delete(PlaybookTag).where(PlaybookTag.playbook_id == playbook_id)
-            )
+            await self.db.execute(delete(PlaybookTag).where(PlaybookTag.playbook_id == playbook_id))
             for tid in tag_ids:
                 self.db.add(PlaybookTag(playbook_id=playbook_id, tag_id=tid))
             await self.db.flush()
@@ -244,9 +239,7 @@ class PlaybookRepository:
 
     async def increment_use_count(self, playbook_id: int) -> None:
         await self.db.execute(
-            update(Playbook)
-            .where(Playbook.id == playbook_id)
-            .values(use_count=Playbook.use_count + 1)
+            update(Playbook).where(Playbook.id == playbook_id).values(use_count=Playbook.use_count + 1)
         )
         await self.db.flush()
 
@@ -328,9 +321,7 @@ class PlaybookRunRepository:
                     step_order=int(s["step_order"]),
                     step_name=str(s.get("step_name") or ""),
                     user_output=(s.get("user_output") or None),
-                    form_values_json=(
-                        json.dumps(fv, ensure_ascii=False) if fv else None
-                    ),
+                    form_values_json=(json.dumps(fv, ensure_ascii=False) if fv else None),
                     filled_prompt=filled,
                 )
             )
@@ -375,9 +366,7 @@ class PlaybookRunRepository:
             return None
         # 显式 selectinload steps (get 不会自动 eager load relationship)
         result = await self.db.execute(
-            select(PlaybookRun)
-            .where(PlaybookRun.id == run_id)
-            .options(selectinload(PlaybookRun.steps))
+            select(PlaybookRun).where(PlaybookRun.id == run_id).options(selectinload(PlaybookRun.steps))
         )
         return result.scalar_one_or_none()
 

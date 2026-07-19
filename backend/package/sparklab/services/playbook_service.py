@@ -9,6 +9,7 @@ Prompt 模型:
   - PlaybookStep 额外支持特殊占位符 {{prev_output}} — 由用户在运行期把上一步 AI 平台
     的返回结果粘回,后端按 step_order 顺序串起来。
 """
+
 import re
 
 from fastapi import HTTPException, status
@@ -22,7 +23,6 @@ from sparklab.schemas.playbook import (
     PlaybookRunResponse,
     PlaybookRunStep,
 )
-
 
 _VAR_REGEX = re.compile(r"\{\{(.*?)\}\}")
 
@@ -72,9 +72,7 @@ class PlaybookService:
         return out
 
     @staticmethod
-    def _validate_variable_hints_coverage(
-        content: str, variable_hints: dict | None
-    ) -> None:
+    def _validate_variable_hints_coverage(content: str, variable_hints: dict | None) -> None:
         """校验 content 中出现的 {{变量}} 都被 variable_hints 覆盖。"""
         if variable_hints is None:
             return
@@ -123,7 +121,7 @@ class PlaybookService:
             if sig in seen_signatures:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"工作流中存在完全重复的步骤（name + content 都相同）",
+                    detail="工作流中存在完全重复的步骤（name + content 都相同）",
                 )
             seen_signatures.add(sig)
 
@@ -143,10 +141,12 @@ class PlaybookService:
     @staticmethod
     def _fill_variables(text: str, values: dict[str, str]) -> str:
         """把 {{var}} 替换为 values[var]（trim 后的值）；缺失的 var 保留原样。"""
+
         def repl(m: re.Match) -> str:
             key = m.group(1).strip()
             val = values.get(key)
             return val.strip() if val is not None else m.group(0)
+
         return _VAR_REGEX.sub(repl, text or "")
 
     @staticmethod
@@ -216,20 +216,16 @@ class PlaybookService:
     async def get_playbook(self, playbook_id: int) -> Playbook | None:
         return await self.repo.get_by_id(playbook_id)
 
-    async def get_playbook_for_user(
-        self, playbook_id: int, user
-    ) -> Playbook | None:
+    async def get_playbook_for_user(self, playbook_id: int, user) -> Playbook | None:
         """可见性规则:
-          - 私有流程: 仅 creator 可见
-          - 公开流程 published: 任何登录用户
-          - 公开流程 draft / archived: 仅 creator 或 admin / super_admin
+        - 私有流程: 仅 creator 可见
+        - 公开流程 published: 任何登录用户
+        - 公开流程 draft / archived: 仅 creator 或 admin / super_admin
         """
         playbook = await self.get_playbook(playbook_id)
         if playbook is None:
             return None
-        status_value = (
-            playbook.status.value if hasattr(playbook.status, "value") else playbook.status
-        )
+        status_value = playbook.status.value if hasattr(playbook.status, "value") else playbook.status
         # 私有流程：仅创建者可见
         if playbook.is_private:
             if user is not None and getattr(user, "id", None) == playbook.creator_id:
@@ -342,9 +338,7 @@ class PlaybookService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="工作流不存在",
             )
-        status_value = (
-            playbook.status.value if hasattr(playbook.status, "value") else playbook.status
-        )
+        status_value = playbook.status.value if hasattr(playbook.status, "value") else playbook.status
         if status_value == "published":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -390,9 +384,7 @@ class PlaybookService:
         wf_filled = self._fill_variables(playbook.content or "", form_values or {})
 
         # 2) step_outputs 按 step_order 建索引
-        step_outputs_map: dict[int, object] = {
-            so.step_order: so for so in (step_outputs or [])
-        }
+        step_outputs_map: dict[int, object] = {so.step_order: so for so in (step_outputs or [])}
         valid_orders = {s.step_order for s in playbook.steps}
         for order in step_outputs_map.keys():
             if order not in valid_orders:
@@ -407,9 +399,7 @@ class PlaybookService:
             so = step_outputs_map.get(step.step_order)
             so_form = so.form_values if so else {}
             so_prev = so.prev_output if so else None
-            filled, prev_injected = self._fill_with_specials(
-                step.content or "", so_form or {}, so_prev
-            )
+            filled, prev_injected = self._fill_with_specials(step.content or "", so_form or {}, so_prev)
             rendered_steps.append(
                 PlaybookRunStep(
                     step_order=step.step_order,
@@ -435,7 +425,6 @@ class PlaybookService:
 # 工作流运行记录 (个人中心 / 我的运行记录)
 # ===========================================================================
 
-import json as _json
 from datetime import datetime as _dt
 
 from sparklab.models.playbook import PlaybookRun  # noqa: E402
@@ -480,9 +469,7 @@ class PlaybookRunService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="工作流不存在",
             )
-        status_value = (
-            playbook.status.value if hasattr(playbook.status, "value") else playbook.status
-        )
+        status_value = playbook.status.value if hasattr(playbook.status, "value") else playbook.status
         if status_value != "published":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

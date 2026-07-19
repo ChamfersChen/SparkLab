@@ -1,9 +1,9 @@
 """标签管理的 e2e 测试（用户端 + 管理后台）。"""
+
 import time
 
 import pytest
 from httpx import AsyncClient
-
 from sparklab.config import get_settings
 
 

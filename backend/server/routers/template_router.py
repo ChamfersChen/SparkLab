@@ -24,7 +24,7 @@ from sparklab.schemas.template import (
     TemplateRunDetail,
     TemplateRunListResponse,
 )
-from sparklab.services.template_service import TemplateService, TemplateRunService
+from sparklab.services.template_service import TemplateRunService, TemplateService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.utils.auth_middleware import get_db, get_required_user
@@ -64,6 +64,7 @@ def _parse_tag_id_groups(raw: str | None) -> list[list[int]] | None:
 # 必须在 {template_id} 路径之前声明, 否则会被参数化路径吞掉
 # ---------------------------------------------------------------------------
 
+
 @template.get("/runs", response_model=TemplateRunListResponse)
 async def list_my_runs(
     page: int = Query(1, ge=1),
@@ -73,7 +74,9 @@ async def list_my_runs(
 ):
     """当前用户的模板使用记录列表, 按 created_at DESC."""
     items, total = await run_service.list_user_runs(
-        user.id, offset=(page - 1) * page_size, limit=page_size,
+        user.id,
+        offset=(page - 1) * page_size,
+        limit=page_size,
     )
     return TemplateRunListResponse(items=items, total=total)
 
@@ -128,6 +131,7 @@ async def delete_my_run(
 # ---------------------------------------------------------------------------
 # 模板本身的端点 (参数化路径放最后)
 # ---------------------------------------------------------------------------
+
 
 @template.get("", response_model=TemplateListResponse)
 async def list_templates(

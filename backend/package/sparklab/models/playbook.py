@@ -32,26 +32,18 @@ class PlaybookTag(Base):
 
     __tablename__ = "playbook_tags"
 
-    playbook_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("playbooks.id", ondelete="CASCADE"), primary_key=True
-    )
-    tag_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True
-    )
+    playbook_id: Mapped[int] = mapped_column(Integer, ForeignKey("playbooks.id", ondelete="CASCADE"), primary_key=True)
+    tag_id: Mapped[int] = mapped_column(Integer, ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True)
 
 
 class PlaybookStep(Base):
     """工作流的一个步骤。自带 prompt content (Markdown + {{var}} + {{prev_output}})。"""
 
     __tablename__ = "playbook_steps"
-    __table_args__ = (
-        UniqueConstraint("playbook_id", "step_order", name="uq_playbook_steps_playbook_order"),
-    )
+    __table_args__ = (UniqueConstraint("playbook_id", "step_order", name="uq_playbook_steps_playbook_order"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    playbook_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("playbooks.id", ondelete="CASCADE"), nullable=False
-    )
+    playbook_id: Mapped[int] = mapped_column(Integer, ForeignKey("playbooks.id", ondelete="CASCADE"), nullable=False)
     step_order: Mapped[int] = mapped_column(Integer, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -81,9 +73,7 @@ class Playbook(Base, TimestampMixin):
         default=PlaybookStatus.DRAFT,
     )
     use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    creator_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
+    creator_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     # 是否为私有流程（普通用户创建为私有，管理员创建为公开）
     is_private: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
@@ -114,12 +104,8 @@ class PlaybookRun(Base, TimestampMixin):
     __tablename__ = "playbook_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
-    playbook_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("playbooks.id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    playbook_id: Mapped[int] = mapped_column(Integer, ForeignKey("playbooks.id", ondelete="CASCADE"), nullable=False)
     # 用户自定义标题; 默认值由 service 层根据 playbook.title + 时间戳生成
     title: Mapped[str | None] = mapped_column(String(200), nullable=True)
     # v4: 用户在三栏页右栏填的"最终结果" (Markdown 源文本)
@@ -147,9 +133,7 @@ class PlaybookRunStep(Base, TimestampMixin):
     __tablename__ = "playbook_run_steps"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("playbook_runs.id", ondelete="CASCADE"), nullable=False
-    )
+    run_id: Mapped[int] = mapped_column(Integer, ForeignKey("playbook_runs.id", ondelete="CASCADE"), nullable=False)
     step_order: Mapped[int] = mapped_column(Integer, nullable=False)
     # 步骤名快照 (原 step 改名不影响历史)
     step_name: Mapped[str] = mapped_column(String(200), nullable=False)

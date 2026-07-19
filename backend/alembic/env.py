@@ -7,16 +7,15 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
+# 让 alembic env.py 能 import 业务包
+# （由 alembic.ini 中 prepend_sys_path 提供 . / package / server）
+from sparklab.config import get_settings
+from sparklab.models import Base  # noqa: F401  - 触发模型导入，让 autogenerate 能扫到
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-# 让 alembic env.py 能 import 业务包
-# （由 alembic.ini 中 prepend_sys_path 提供 . / package / server）
-
-from sparklab.config import get_settings
-from sparklab.models import Base  # noqa: F401  - 触发模型导入，让 autogenerate 能扫到
+from alembic import context
 
 # 后续模型加入后，在 sparklab/models/__init__.py 中显式导出所有模型类即可
 

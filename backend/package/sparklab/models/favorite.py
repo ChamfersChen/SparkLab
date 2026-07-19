@@ -19,9 +19,7 @@ class Favorite(Base, TimestampMixin):
     """用户收藏记录。联合唯一约束: (user_id, target_type, target_id)。"""
 
     __tablename__ = "favorites"
-    __table_args__ = (
-        UniqueConstraint("user_id", "target_type", "target_id", name="uq_user_favorite_target"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "target_type", "target_id", name="uq_user_favorite_target"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)

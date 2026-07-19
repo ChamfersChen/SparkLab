@@ -4,8 +4,8 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sparklab.models.favorite import Favorite, FavoriteTargetType
-from sparklab.models.playbook import Playbook, PlaybookStatus
-from sparklab.models.template import Template, TemplateStatus
+from sparklab.models.playbook import Playbook
+from sparklab.models.template import Template
 
 
 class FavoriteRepository:
@@ -56,44 +56,42 @@ class FavoriteRepository:
         playbook_map: dict[int, Playbook] = {}
 
         if template_ids:
-            tpl_result = await self.db.execute(
-                select(Template).where(Template.id.in_(template_ids))
-            )
+            tpl_result = await self.db.execute(select(Template).where(Template.id.in_(template_ids)))
             template_map = {t.id: t for t in tpl_result.scalars().all()}
 
         if playbook_ids:
-            pb_result = await self.db.execute(
-                select(Playbook).where(Playbook.id.in_(playbook_ids))
-            )
+            pb_result = await self.db.execute(select(Playbook).where(Playbook.id.in_(playbook_ids)))
             playbook_map = {p.id: p for p in pb_result.scalars().all()}
 
         for fav in favorites:
             if fav.target_type == FavoriteTargetType.TEMPLATE:
                 tpl = template_map.get(fav.target_id)
-                items.append({
-                    "id": fav.id,
-                    "target_type": fav.target_type.value,
-                    "target_id": fav.target_id,
-                    "title": tpl.title if tpl else "",
-                    "description": tpl.description if tpl else "",
-                    "created_at": fav.created_at,
-                })
+                items.append(
+                    {
+                        "id": fav.id,
+                        "target_type": fav.target_type.value,
+                        "target_id": fav.target_id,
+                        "title": tpl.title if tpl else "",
+                        "description": tpl.description if tpl else "",
+                        "created_at": fav.created_at,
+                    }
+                )
             else:
                 pb = playbook_map.get(fav.target_id)
-                items.append({
-                    "id": fav.id,
-                    "target_type": fav.target_type.value,
-                    "target_id": fav.target_id,
-                    "title": pb.title if pb else "",
-                    "description": pb.description if pb else "",
-                    "created_at": fav.created_at,
-                })
+                items.append(
+                    {
+                        "id": fav.id,
+                        "target_type": fav.target_type.value,
+                        "target_id": fav.target_id,
+                        "title": pb.title if pb else "",
+                        "description": pb.description if pb else "",
+                        "created_at": fav.created_at,
+                    }
+                )
 
         return items, total
 
-    async def create(
-        self, user_id: int, target_type: FavoriteTargetType, target_id: int
-    ) -> Favorite:
+    async def create(self, user_id: int, target_type: FavoriteTargetType, target_id: int) -> Favorite:
         fav = Favorite(
             user_id=user_id,
             target_type=target_type,

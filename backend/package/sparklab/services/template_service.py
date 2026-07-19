@@ -7,9 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from sparklab.models.tag import Tag
-from sparklab.models.template import Template, TemplateStatus
+from sparklab.models.template import Template
 from sparklab.repositories.template_repository import TemplateRepository, TemplateRunRepository
-
 
 _VAR_REGEX = re.compile(r"\{\{(.*?)\}\}")
 
@@ -25,9 +24,7 @@ class TemplateService:
         return list(dict.fromkeys(m.strip() for m in _VAR_REGEX.findall(content or "")))
 
     @staticmethod
-    def _validate_variable_hints_coverage(
-        content: str, variable_hints: dict | None
-    ) -> None:
+    def _validate_variable_hints_coverage(content: str, variable_hints: dict | None) -> None:
         """校验 content 中出现的 {{变量}} 都被 variable_hints 覆盖。
 
         当 variable_hints 为 None 时视为「按需配置」,不强制覆盖;
@@ -105,9 +102,7 @@ class TemplateService:
     async def get_template(self, template_id: int) -> Template | None:
         return await self.repo.get_by_id(template_id)
 
-    async def get_template_for_user(
-        self, template_id: int, user_id: int | None
-    ) -> Template | None:
+    async def get_template_for_user(self, template_id: int, user_id: int | None) -> Template | None:
         """按作者可见性获取模板。
 
         - published 且非私有: 任何登录用户可见
@@ -118,11 +113,7 @@ class TemplateService:
         template = await self.get_template(template_id)
         if template is None:
             return None
-        status_value = (
-            template.status.value
-            if hasattr(template.status, "value")
-            else template.status
-        )
+        status_value = template.status.value if hasattr(template.status, "value") else template.status
         # 私有模板：仅创建者可见
         if template.is_private:
             if user_id is not None and template.creator_id == user_id:
@@ -219,11 +210,7 @@ class TemplateService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="模板不存在",
             )
-        status_value = (
-            template.status.value
-            if hasattr(template.status, "value")
-            else template.status
-        )
+        status_value = template.status.value if hasattr(template.status, "value") else template.status
         if status_value == "published":
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -271,9 +258,7 @@ class TemplateRunService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="模板不存在",
             )
-        status_value = (
-            template.status.value if hasattr(template.status, "value") else template.status
-        )
+        status_value = template.status.value if hasattr(template.status, "value") else template.status
         if status_value != "published":
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

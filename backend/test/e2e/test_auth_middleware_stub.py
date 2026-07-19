@@ -8,8 +8,6 @@ import pytest
 from fastapi import HTTPException
 
 from server.utils.auth_middleware import (
-    get_current_admin,
-    get_current_super_admin,
     get_current_user,
     get_required_user,
 )
